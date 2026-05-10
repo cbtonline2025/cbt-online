@@ -1,0 +1,6 @@
+{
+  "name": "CBT Kurikulum Merdeka",
+  "description": "A comprehensive online exam system (CBT) designed according to the latest BSKAP Kurikulum Merdeka standards for phases D, E, and F. It features role-based access for students, teachers, and proctors, with advanced functionalities like anti-cheat, question randomization, and AI-powered essay analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

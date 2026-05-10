@@ -1,0 +1,206 @@
+
+import { User, Role, StudentData, Question, QuestionType, Exam, QuestionMediaType } from '../types';
+
+// --- Initial Data ---
+const initialNISNData: { [key: string]: StudentData } = {
+  '0012345678': {
+    nisn: '0012345678',
+    fullName: 'Ahmad Prasetyo',
+    class: 'XII-IPA-1',
+    school: 'SMA Negeri 1 Jakarta',
+    city: 'Jakarta Pusat',
+    province: 'DKI Jakarta',
+  },
+  '0087654321': {
+    nisn: '0087654321',
+    fullName: 'Budi Santoso',
+    class: 'IX-B',
+    school: 'SMP Negeri 2 Bandung',
+    city: 'Bandung',
+    province: 'Jawa Barat',
+  },
+};
+
+const initialUsers: User[] = [
+  { id: 'user-1', username: '0012345678', fullName: 'Ahmad Prasetyo', role: Role.STUDENT, details: initialNISNData['0012345678'] },
+  { id: 'user-2', username: '0087654321', fullName: 'Budi Santoso', role: Role.STUDENT, details: initialNISNData['0087654321'] },
+  { id: 'user-teacher-1', username: 'guru_ipa', fullName: 'Dr. Citra Dewi', role: Role.TEACHER },
+  { id: 'user-admin-1', username: 'proktor_utama', fullName: 'Admin Utama', role: Role.ADMIN },
+];
+
+const initialQuestions: Question[] = [
+    // Fase F (SMA) - Fisika
+    { id: 'q1', type: QuestionType.MULTIPLE_CHOICE, mediaType: QuestionMediaType.TEXT, content: 'Sebuah benda bergerak dengan kecepatan konstan 5 m/s. Berapa jarak yang ditempuh benda tersebut setelah 10 detik?', subject: 'Fisika', phase: 'F', options: [{id: 'q1o1', text: '25 m'}, {id: 'q1o2', text: '50 m'}, {id: 'q1o3', text: '100 m'}, {id: 'q1o4', text: '10 m'}, {id: 'q1o5', text: '5 m'}], correctAnswer: 'q1o2' },
+    { id: 'q2', type: QuestionType.MULTIPLE_CHOICE, mediaType: QuestionMediaType.TEXT, content: 'Hukum II Newton menyatakan bahwa percepatan sebuah benda berbanding lurus dengan...', subject: 'Fisika', phase: 'F', options: [{id: 'q2o1', text: 'Massa benda'}, {id: 'q2o2', text: 'Kecepatan benda'}, {id: 'q2o3', text: 'Gaya total yang bekerja pada benda'}, {id: 'q2o4', text: 'Volume benda'}, {id: 'q2o5', text: 'Waktu'}], correctAnswer: 'q2o3' },
+    { id: 'q3', type: QuestionType.ESSAY, mediaType: QuestionMediaType.TEXT, content: 'Jelaskan secara singkat prinsip kerja transformator step-up!', subject: 'Fisika', phase: 'F', correctAnswer: 'Transformator step-up bekerja berdasarkan prinsip induksi elektromagnetik. Ia memiliki jumlah lilitan sekunder lebih banyak daripada lilitan primer, sehingga menaikkan tegangan (voltase) sambil menurunkan arus.' },
+    // Fase D (SMP) - IPA
+    { id: 'q4', type: QuestionType.MULTIPLE_CHOICE, mediaType: QuestionMediaType.TEXT, content: 'Proses perubahan wujud dari cair menjadi gas disebut...', subject: 'IPA', phase: 'D', options: [{id: 'q4o1', text: 'Mencair'}, {id: 'q4o2', text: 'Membeku'}, {id: 'q4o3', text: 'Menguap'}, {id: 'q4o4', text: 'Menyublim'}], correctAnswer: 'q4o3' },
+    { id: 'q5', type: QuestionType.MULTIPLE_CHOICE, mediaType: QuestionMediaType.TEXT, content: 'Bagian tumbuhan yang berfungsi untuk menyerap air dan mineral dari dalam tanah adalah...', subject: 'IPA', phase: 'D', options: [{id: 'q5o1', text: 'Daun'}, {id: 'q5o2', text: 'Batang'}, {id: 'q5o3', text: 'Bunga'}, {id: 'q5o4', text: 'Akar'}], correctAnswer: 'q5o4' },
+    { id: 'q6', type: QuestionType.ESSAY, mediaType: QuestionMediaType.TEXT, content: 'Sebutkan 3 contoh sumber energi terbarukan!', subject: 'IPA', phase: 'D', correctAnswer: 'Contoh sumber energi terbarukan antara lain: energi matahari (surya), energi angin, energi air (hidroelektrik), energi panas bumi (geotermal), dan biomassa.' },
+    { id: 'q7', type: QuestionType.MULTIPLE_CHOICE, mediaType: QuestionMediaType.TEXT, content: 'Planet yang dikenal sebagai "Planet Merah" adalah...', subject: 'IPA', phase: 'D', options: [{id: 'q7o1', text: 'Venus'}, {id: 'q7o2', text: 'Mars'}, {id: 'q7o3', text: 'Jupiter'}, {id: 'q7o4', text: 'Saturnus'}], correctAnswer: 'q7o2' },
+    // Fase F (SMA) - Bahasa Inggris (Audio)
+    { 
+      id: 'q8', 
+      type: QuestionType.MULTIPLE_CHOICE, 
+      mediaType: QuestionMediaType.AUDIO,
+      promptText: 'Listen to the conversation and answer the following question: What are the speakers mainly discussing?',
+      content: 'https://drive.google.com/file/d/1Y2_tQ4hV_3f7g8hI5yL9xW3zV6n7o8kU/view?usp=sharing', // Example audio
+      subject: 'Bahasa Inggris', 
+      phase: 'F', 
+      options: [
+          {id: 'q8o1', text: 'Their holiday plans'}, 
+          {id: 'q8o2', text: 'A difficult assignment'}, 
+          {id: 'q8o3', text: 'The weather forecast'}, 
+          {id: 'q8o4', text: 'A new movie release'},
+          {id: 'q8o5', text: 'Weekend sports'}
+      ], 
+      correctAnswer: 'q8o2' 
+    },
+    // Fase D (SMP) - IPS (Video)
+    { 
+      id: 'q9', 
+      type: QuestionType.ESSAY, 
+      mediaType: QuestionMediaType.VIDEO,
+      promptText: 'Watch the following video about the "Tari Saman". Based on the video, explain the main philosophy behind the dance movements.',
+      content: 'https://www.youtube.com/watch?v=R_iMAEWkulA', // Example video
+      subject: 'IPS', 
+      phase: 'D', 
+      correctAnswer: 'The philosophy of Saman dance includes togetherness, cohesiveness, discipline, and religious values, reflected in its synchronized and fast-paced movements.'
+    },
+];
+
+// --- Local Storage Keys ---
+const USERS_STORAGE_KEY = 'cbt-merdeka-users';
+const NISN_STORAGE_KEY = 'cbt-merdeka-nisn';
+const QUESTIONS_STORAGE_KEY = 'cbt-merdeka-questions';
+
+// --- Data Hydration ---
+const loadData = <T,>(key: string, initialData: T): T => {
+    try {
+        const item = window.localStorage.getItem(key);
+        if (item) {
+            return JSON.parse(item);
+        }
+        // If no item, set it and return initial data
+        window.localStorage.setItem(key, JSON.stringify(initialData));
+        return initialData;
+    } catch (error) {
+        console.error(`Error interacting with localStorage for key "${key}"`, error);
+        return initialData;
+    }
+};
+
+// --- Exported Data (Mutable) ---
+export let mockUsers: User[] = loadData(USERS_STORAGE_KEY, initialUsers);
+export let mockNISNData: { [key: string]: StudentData } = loadData(NISN_STORAGE_KEY, initialNISNData);
+export let mockQuestions: Question[] = loadData(QUESTIONS_STORAGE_KEY, initialQuestions);
+
+// --- Data Persistence Functions ---
+const saveUsers = () => {
+    try {
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(mockUsers));
+        localStorage.setItem(NISN_STORAGE_KEY, JSON.stringify(mockNISNData));
+    } catch (error) {
+        console.error("Error saving user data to localStorage", error);
+    }
+};
+
+const saveQuestions = () => {
+     try {
+        localStorage.setItem(QUESTIONS_STORAGE_KEY, JSON.stringify(mockQuestions));
+    } catch (error) {
+        console.error("Error saving question data to localStorage", error);
+    }
+};
+
+
+export const mockExams: Exam[] = [
+    { id: 'exam-fisika-1', title: 'Ujian Akhir Semester Fisika', subject: 'Fisika', phase: 'F', durationMinutes: 90, questionIds: ['q1', 'q2', 'q3'] },
+    { id: 'exam-ipa-1', title: 'Latihan ANBK IPA', subject: 'IPA', phase: 'D', durationMinutes: 60, questionIds: ['q4', 'q5', 'q6', 'q7', 'q9'] },
+    { id: 'exam-bing-1', title: 'Listening Comprehension', subject: 'Bahasa Inggris', phase: 'F', durationMinutes: 45, questionIds: ['q8'] }
+];
+
+// Mock API functions
+export const fetchNISNData = async (nisn: string): Promise<StudentData | null> => {
+    console.log(`Searching for NISN: ${nisn}`);
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve(mockNISNData[nisn] || null);
+        }, 500);
+    });
+};
+
+export const registerNewStudent = async (studentData: StudentData): Promise<{user: User | null, error?: string}> => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const existingUser = mockUsers.find(u => u.username === studentData.nisn);
+            if (existingUser) {
+                resolve({ user: null, error: 'Pengguna dengan NISN ini sudah terdaftar.' });
+                return;
+            }
+
+            const newStudentUser: User = {
+                id: `user-${Date.now()}`,
+                username: studentData.nisn,
+                fullName: studentData.fullName,
+                role: Role.STUDENT,
+                details: studentData,
+            };
+            mockUsers.push(newStudentUser);
+            mockNISNData[studentData.nisn] = studentData;
+            saveUsers();
+            resolve({ user: newStudentUser });
+        }, 300);
+    });
+};
+
+
+export const fetchExamDetails = async (examId: string): Promise<{exam: Exam, questions: Question[]} | null> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            const exam = mockExams.find(e => e.id === examId);
+            if (!exam) {
+                resolve(null);
+                return;
+            }
+            const questions = mockQuestions.filter(q => exam.questionIds.includes(q.id));
+            resolve({ exam, questions });
+        }, 500);
+    });
+};
+
+export const addQuestions = async (newQuestions: Question[]): Promise<boolean> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            mockQuestions.push(...newQuestions);
+            saveQuestions();
+            console.log('New questions added:', newQuestions);
+            console.log('Total questions now:', mockQuestions.length);
+            resolve(true);
+        }, 300);
+    });
+};
+
+export const fetchQuestionById = async (id: string): Promise<Question | null> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            const question = mockQuestions.find(q => q.id === id);
+            resolve(question || null);
+        }, 300);
+    });
+};
+
+export const updateQuestion = async (updatedQuestion: Question): Promise<boolean> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            const index = mockQuestions.findIndex(q => q.id === updatedQuestion.id);
+            if (index !== -1) {
+                mockQuestions[index] = updatedQuestion;
+                saveQuestions();
+                resolve(true);
+            } else {
+                resolve(false);
+            }
+        }, 300);
+    });
+};
