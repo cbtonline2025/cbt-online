@@ -17,24 +17,38 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({
 }) => {
   const getButtonClass = (index: number) => {
     const answer = answers[index];
-    let baseClass = 'w-12 h-12 flex items-center justify-center rounded-md font-bold transition-transform transform hover:scale-110 ';
+    const isActive = index === currentQuestionIndex;
+    const isDoubtful = answer?.isDoubtful;
+    const isAnswered = !!answer?.answer;
     
-    if (index === currentQuestionIndex) {
-      return baseClass + 'bg-indigo-600 text-white ring-2 ring-indigo-300 dark:ring-white shadow-lg';
+    let baseClass = 'w-12 h-12 flex items-center justify-center rounded-2xl font-black text-sm transition-all duration-300 transform active:scale-90 ';
+    
+    if (isActive) {
+      if (isDoubtful) {
+        return baseClass + 'bg-amber-500 text-white ring-4 ring-amber-100 shadow-lg scale-110 z-10';
+      }
+      return baseClass + 'bg-indigo-600 text-white ring-4 ring-indigo-100 shadow-xl scale-110 z-10';
     }
-    if (answer?.isDoubtful) {
-      return baseClass + 'bg-amber-400 text-black';
+    
+    if (isDoubtful) {
+      return baseClass + 'bg-amber-100 text-amber-600 border-2 border-amber-400 hover:bg-amber-500 hover:text-white shadow-sm';
     }
-    if (answer?.answer) {
-      return baseClass + 'bg-emerald-500 dark:bg-green-600 text-white';
+    
+    if (isAnswered) {
+      return baseClass + 'bg-emerald-50 text-emerald-600 border-2 border-emerald-400 hover:bg-emerald-500 hover:text-white shadow-sm';
     }
-    return baseClass + 'bg-white/50 hover:bg-white/80 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-300';
+    
+    return baseClass + 'bg-white text-slate-400 border-2 border-slate-100 hover:border-indigo-200 hover:text-indigo-500 shadow-sm';
   };
 
   return (
-    <div className="bg-white/40 dark:bg-slate-800/50 rounded-lg p-4 flex-grow">
-      <h3 className="text-center font-semibold mb-4 text-slate-800 dark:text-white">Navigasi Soal</h3>
-      <div className="grid grid-cols-4 gap-2 max-h-80 overflow-y-auto pr-1">
+    <div className="glass-card border-slate-100 p-8 flex-grow flex flex-col h-full ring-1 ring-slate-100 italic">
+      <div className="flex items-center justify-center gap-2 mb-8 not-italic">
+        <div className="h-1 w-4 bg-slate-200 rounded-full"></div>
+        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Status Soal</h3>
+        <div className="h-1 w-4 bg-slate-200 rounded-full"></div>
+      </div>
+      <div className="grid grid-cols-5 gap-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-100 not-italic">
         {questions.map((q, index) => (
           <button
             key={q.id}

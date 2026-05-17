@@ -36,8 +36,6 @@ export const useAntiCheat = (onLeave: AntiCheatCallback, maxWarnings: number = 3
   useEffect(() => {
     if (warnings > maxWarnings && !isDisqualified) {
       setIsDisqualified(true);
-      // In a real app, you might auto-submit the exam here.
-      alert('Anda telah melakukan pelanggaran. Ujian akan dihentikan.');
     }
   }, [warnings, maxWarnings, isDisqualified]);
 

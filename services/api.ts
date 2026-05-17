@@ -56,16 +56,44 @@ const initialQuestions: Question[] = [
       ], 
       correctAnswer: 'q8o2' 
     },
-    // Fase D (SMP) - IPS (Video)
+    // Fase D (SMP) - IPS (Video YouTube)
     { 
       id: 'q9', 
       type: QuestionType.ESSAY, 
       mediaType: QuestionMediaType.VIDEO,
-      promptText: 'Watch the following video about the "Tari Saman". Based on the video, explain the main philosophy behind the dance movements.',
-      content: 'https://www.youtube.com/watch?v=R_iMAEWkulA', // Example video
+      promptText: 'Tonton video "Tari Saman" berikut. Berdasarkan video tersebut, jelaskan filosofi utama di balik gerakan tarian tersebut!',
+      content: 'https://www.youtube.com/watch?v=R_iMAEWkulA', 
       subject: 'IPS', 
       phase: 'D', 
-      correctAnswer: 'The philosophy of Saman dance includes togetherness, cohesiveness, discipline, and religious values, reflected in its synchronized and fast-paced movements.'
+      correctAnswer: 'Filosofi tari Saman antara lain kebersamaan, kekompakan, kedisiplinan, serta nilai-nilai keagamaan yang tercermin dalam gerakannya yang serempak dan cepat.'
+    },
+    // Fase F (SMA) - Biologi (Video Drive)
+    { 
+      id: 'q10', 
+      type: QuestionType.MULTIPLE_CHOICE, 
+      mediaType: QuestionMediaType.VIDEO,
+      promptText: 'Perhatikan video proses pembelahan sel berikut. Fase apa yang sedang ditunjukkan pada menit ke 0:15?',
+      content: 'https://drive.google.com/file/d/1X5_tP4hV_4f7g8hI5yL9xW3zV6n7o8kU/view', // Mock Drive Video
+      subject: 'Biologi', 
+      phase: 'F', 
+      options: [
+          {id: 'q10o1', text: 'Profase'}, 
+          {id: 'q10o2', text: 'Metafase'}, 
+          {id: 'q10o3', text: 'Anafase'}, 
+          {id: 'q10o4', text: 'Telofase'}
+      ], 
+      correctAnswer: 'q10o2' 
+    },
+    // Fase F (SMA) - Bahasa Indonesia (Audio Drive)
+    { 
+      id: 'q11', 
+      type: QuestionType.ESSAY, 
+      mediaType: QuestionMediaType.AUDIO,
+      promptText: 'Dengarkan pembacaan puisi berikut dengan seksama. Apa nada (tone) yang dominan dalam pembacaan puisi tersebut?',
+      content: 'https://drive.google.com/file/d/1Z3_tQ4hV_4f7g8hI5yL9xW3zV6n7o8kV/preview', // Mock Drive Audio
+      subject: 'Bahasa Indonesia', 
+      phase: 'F', 
+      correctAnswer: 'Nada yang dominan adalah melankolis dan penuh perenungan (kontemplatif).'
     },
 ];
 
@@ -115,12 +143,21 @@ const saveQuestions = () => {
 
 
 export const mockExams: Exam[] = [
-    { id: 'exam-fisika-1', title: 'Ujian Akhir Semester Fisika', subject: 'Fisika', phase: 'F', durationMinutes: 90, questionIds: ['q1', 'q2', 'q3'] },
+    { id: 'exam-fisika-1', title: 'Ujian Akhir Semester Fisika', subject: 'Fisika', phase: 'F', durationMinutes: 90, questionIds: ['q1', 'q2', 'q3', 'q10'] },
     { id: 'exam-ipa-1', title: 'Latihan ANBK IPA', subject: 'IPA', phase: 'D', durationMinutes: 60, questionIds: ['q4', 'q5', 'q6', 'q7', 'q9'] },
-    { id: 'exam-bing-1', title: 'Listening Comprehension', subject: 'Bahasa Inggris', phase: 'F', durationMinutes: 45, questionIds: ['q8'] }
+    { id: 'exam-bing-1', title: 'Listening Comprehension', subject: 'Bahasa Inggris', phase: 'F', durationMinutes: 45, questionIds: ['q8', 'q11'] }
 ];
 
 // Mock API functions
+export const checkNISNData = async (nisn: string): Promise<User | null> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            const user = mockUsers.find(u => u.username === nisn);
+            resolve(user || null);
+        }, 300);
+    });
+};
+
 export const fetchNISNData = async (nisn: string): Promise<StudentData | null> => {
     console.log(`Searching for NISN: ${nisn}`);
     return new Promise(resolve => {

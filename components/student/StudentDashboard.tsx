@@ -55,53 +55,81 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onStartExam, 
   }
 
   return (
-    <div className="w-full max-w-5xl glass p-8 rounded-2xl">
-      <div className="flex justify-between items-start mb-8">
+    <div className="w-full max-w-5xl glass-card p-10 ring-1 ring-slate-100">
+      <div className="flex flex-col md:flex-row justify-between items-start mb-12 gap-6">
         <div>
-          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-indigo-600 dark:from-white dark:to-indigo-400">Halo, {user.fullName}!</h1>
-          <p className="text-slate-600 dark:text-slate-300 mt-1">Selamat datang di portal ujian online.</p>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-indigo-100">Portal Siswa</span>
+            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-100">Online</span>
+          </div>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Halo, {user.fullName}!</h1>
+          <p className="text-slate-500 font-medium mt-1">Selamat datang kembali di sistem ujian kurikulum merdeka.</p>
         </div>
-        <Button onClick={logout} variant="secondary" className="flex items-center gap-2">
+        <Button onClick={logout} variant="secondary" className="flex items-center gap-2 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm rounded-xl px-6 py-3">
           <LogOut className="w-4 h-4" />
-          Keluar
+          <span className="font-bold text-xs uppercase tracking-wider">Keluar Sesi</span>
         </Button>
       </div>
 
-      <div className="mt-8 p-6 glass-card rounded-xl">
-          <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-white">Mulai Ujian</h2>
-          <p className="text-slate-700 dark:text-slate-400 mb-4">Masukkan kode token yang diberikan oleh proktor atau guru Anda untuk memulai ujian.</p>
-          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
-              <Input
-                id="token"
-                label="Kode Token Ujian"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="Masukkan token..."
-                className="flex-grow"
-              />
-              <Button onClick={handleStartExam} className="w-full sm:w-auto h-12">Mulai Ujian</Button>
-          </div>
+      <div className="mt-8 p-1 bg-gradient-to-br from-indigo-50 to-sky-50 rounded-3xl">
+        <div className="p-8 bg-white/60 backdrop-blur-sm rounded-[22px] border border-white/50 shadow-inner">
+            <h2 className="text-xl font-black text-slate-900 mb-2 flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-indigo-500"></div>
+              Akses Ujian
+            </h2>
+            <p className="text-slate-500 text-sm font-medium mb-8">Masukkan kode token unik yang diberikan oleh pengawas ujian Anda.</p>
+            <div className="flex flex-col md:flex-row items-end gap-4">
+                <div className="flex-grow w-full">
+                  <Input
+                    id="token"
+                    label="KODE TOKEN UNIK"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    placeholder="Contoh: EXAM-XXXX-XXXX"
+                    className="h-14 rounded-2xl border-slate-200 font-mono text-lg tracking-widest uppercase placeholder:text-slate-300 placeholder:italic placeholder:font-sans placeholder:text-sm"
+                  />
+                </div>
+                <Button onClick={handleStartExam} className="w-full md:w-auto h-14 px-10 rounded-2xl text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-500/20 active:scale-95 transition-all">
+                  KONFIRMASI
+                </Button>
+            </div>
+        </div>
       </div>
       
-      <div className="mt-10">
-        <h2 className="text-2xl font-semibold mb-6 text-slate-800 dark:text-white">Latihan Soal & Ujian Tersedia</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="mt-16">
+        <div className="flex items-center justify-between mb-8 border-b border-slate-100 pb-4">
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Ujian Tersedia</h2>
+          <span className="text-xs font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-full uppercase tracking-tighter">{availableExams.length} Ditemukan</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {availableExams.map(exam => (
-                <div key={exam.id} className="group glass-card p-6 rounded-xl flex flex-col justify-between hover:scale-[1.02]">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h3 className="font-bold text-lg text-slate-800 dark:text-white">{exam.title}</h3>
-                            <p className="text-sm text-slate-600 dark:text-slate-300">{exam.subject} - Fase {exam.phase}</p>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">{exam.durationMinutes} menit</p>
-                        </div>
-                         <SubjectIcon subject={exam.subject} />
+                <div key={exam.id} className="group flex flex-col bg-white border border-slate-100 rounded-3xl p-8 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 transition-all duration-500">
+                    <div className="flex items-start justify-between mb-6">
+                        <SubjectIcon subject={exam.subject} />
+                        <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 uppercase">Fase {exam.phase}</span>
                     </div>
-                    <div className='mt-6'>
-                      <p className='text-xs text-slate-700 dark:text-slate-300 mb-2'>Gunakan token ini untuk memulai:</p>
-                      <div className='flex items-center gap-2'>
-                        <code className='bg-slate-900/5 dark:bg-slate-900/70 text-indigo-700 dark:text-indigo-300 p-2 rounded-md text-sm font-semibold flex-grow text-center'>{exam.id}</code>
-                        <button onClick={() => handleCopyToken(exam.id)} title="Salin Token" className='p-2 hover:bg-indigo-500/10 rounded-md transition-colors'>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-600 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    
+                    <div className="flex-grow">
+                        <h3 className="font-extrabold text-xl text-slate-900 mb-1 group-hover:text-indigo-600 transition-colors leading-tight">{exam.title}</h3>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{exam.subject}</p>
+                        
+                        <div className="mt-4 flex items-center gap-3">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 px-2 py-1 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            {exam.durationMinutes} Menit
+                          </div>
+                        </div>
+                    </div>
+
+                    <div className='mt-8 pt-6 border-t border-slate-50'>
+                      <p className='text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3'>Token Akses Cepat</p>
+                      <div className='flex items-center gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-100 group-hover:border-indigo-100 group-hover:bg-indigo-50/30 transition-all'>
+                        <code className='text-indigo-600 px-3 text-sm font-black tracking-widest flex-grow text-center'>{exam.id}</code>
+                        <button 
+                          onClick={() => handleCopyToken(exam.id)} 
+                          className='p-2.5 bg-white text-slate-400 hover:text-indigo-600 hover:scale-110 shadow-sm border border-slate-100 rounded-xl transition-all active:scale-95'
+                        >
+                          <Copy className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -109,7 +137,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onStartExam, 
             ))}
         </div>
       </div>
-
     </div>
   );
 };

@@ -188,85 +188,134 @@ const QuestionBank: React.FC = () => {
     }
   };
 
-  const handleAddQuestion = async () => {
+    const handleAddQuestion = async () => {
         setAddMessage(null);
         setIsAdding(true);
 
         try {
-            if (!newQuestion.subject || typeof newQuestion.subject !== 'string' || newQuestion.subject.trim().length === 0) {
-                 throw new Error('Mata pelajaran wajib diisi dan tidak boleh hanya berisi spasi.');
+            // 1. Basic Field Validation (Content, Subject, Phase)
+            const subject = (newQuestion.subject || '').trim();
+            const phase = (newQuestion.phase || '').trim();
+            
+            if (!subject) {
+                throw new Error('Mata pelajaran (subjek) wajib diisi.');
+            }
+            if (!phase) {
+                throw new Error('Fase (D/E/F) wajib dipilih.');
+            }
+
+            // Media specific content validation
+            let content = '';
+            let promptText = '';
+
+            if (newQuestion.mediaType === QuestionMediaType.TEXT) {
+                const textContent = (newQuestion.content || '').trim();
+                if (!textContent) {
+                    throw new Error('Konten soal teks wajib diisi.');
+                }
+                content = textContent;
+            } else {
+                const mediaUrl = (newQuestion.mediaUrl || '').trim();
+                const mediaPrompt = (newQuestion.promptText || '').trim();
+
+                if (manualMediaFile) {
+                    // File based media
+                    content = ''; // will be filled by base64 below
+                    promptText = mediaPrompt || `Media: ${manualMediaFile.name}`;
+                } else {
+                    // URL based media
+                    if (!mediaUrl) {
+                        throw new Error(`URL Media ${newQuestion.mediaType} wajib diisi.`);
+                    }
+                    if (!mediaPrompt) {
+                        throw new Error('Teks pengantar media wajib diisi.');
+                    }
+                    content = mediaUrl;
+                    promptText = mediaPrompt;
+                }
             }
 
             const questionToAdd: Question = {
                 id: `manual-${Date.now()}`,
-                content: '',
+                content: content,
                 type: newQuestion.type,
                 mediaType: newQuestion.mediaType,
-                subject: newQuestion.subject.trim(),
-                phase: newQuestion.phase,
+                subject: subject,
+                phase: phase as 'D' | 'E' | 'F',
                 correctAnswer: '',
                 options: [],
             };
 
-            if (newQuestion.mediaType === QuestionMediaType.TEXT) {
-                if (!newQuestion.content.trim()) throw new Error('Konten soal wajib diisi.');
-                questionToAdd.content = newQuestion.content.trim();
-            } else {
-                if (manualMediaFile) {
-                    // Convert file to Base64
-                    const reader = new FileReader();
-                    const base64Promise = new Promise<string>((resolve, reject) => {
-                        reader.onload = () => resolve(reader.result as string);
-                        reader.onerror = reject;
-                        reader.readAsDataURL(manualMediaFile);
-                    });
-                    questionToAdd.content = await base64Promise;
-                    questionToAdd.promptText = newQuestion.promptText.trim() || `Media: ${manualMediaFile.name}`;
-                } else {
-                    if (!newQuestion.mediaUrl.trim()) throw new Error('URL Media wajib diisi.');
-                    if (!newQuestion.promptText.trim()) throw new Error('Teks Pengantar Media wajib diisi.');
-                    questionToAdd.content = newQuestion.mediaUrl.trim();
-                    questionToAdd.promptText = newQuestion.promptText.trim();
-                }
+            // Handle file to base64 if needed
+            if (newQuestion.mediaType !== QuestionMediaType.TEXT && manualMediaFile) {
+                const reader = new FileReader();
+                const base64Promise = new Promise<string>((resolve, reject) => {
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(manualMediaFile);
+                });
+                questionToAdd.content = await base64Promise;
+                questionToAdd.promptText = promptText;
+            } else if (newQuestion.mediaType !== QuestionMediaType.TEXT) {
+                questionToAdd.promptText = promptText;
             }
 
+            // 2. Type Specific Validation (Pilihan Ganda vs Esai)
             if (newQuestion.type === QuestionType.MULTIPLE_CHOICE) {
-                const validOptions = newQuestion.options.filter(opt => opt.text.trim() !== '');
+                // Filter non-empty options
+                const validOptions = newQuestion.options.filter(opt => opt.text && opt.text.trim() !== '');
+                
                 if (validOptions.length < 2) {
-                    throw new Error('Pilihan ganda harus memiliki minimal 2 opsi jawaban yang valid.');
+                    throw new Error('Soal pilihan ganda minimal harus memiliki 2 opsi jawaban yang valid (tidak kosong).');
                 }
-                if (newQuestion.options[newQuestion.correctAnswerIndex].text.trim() === '') {
-                    throw new Error('Kunci jawaban yang dipilih tidak boleh kosong.');
+
+                // Check if the selected correct answer is actually one of the valid options
+                const selectedOption = newQuestion.options[newQuestion.correctAnswerIndex];
+                if (!selectedOption || !selectedOption.text || selectedOption.text.trim() === '') {
+                    throw new Error('Kunci jawaban yang dipilih tidak boleh kosong. Silakan pilih opsi yang berisi teks.');
                 }
                 
-                questionToAdd.options = validOptions.map((opt, i) => ({ id: `${questionToAdd.id}-o${i+1}`, text: opt.text }));
+                // Map to proper QuestionOption format
+                questionToAdd.options = validOptions.map((opt, i) => ({ 
+                    id: `${questionToAdd.id}-o${i+1}`, 
+                    text: opt.text.trim() 
+                }));
                 
-                const correctOptionText = newQuestion.options[newQuestion.correctAnswerIndex].text;
-                const newCorrectIndex = validOptions.findIndex(opt => opt.text === correctOptionText);
+                // Find correct answer ID in the processed options
+                const correctOptionText = selectedOption.text.trim();
+                const finalCorrectOption = questionToAdd.options.find(opt => opt.text === correctOptionText);
 
-                if (newCorrectIndex === -1) {
-                    throw new Error('Kunci jawaban yang dipilih tidak valid atau tidak diisi.');
+                if (!finalCorrectOption) {
+                    throw new Error('Gagal mencocokkan kunci jawaban dengan opsi. Pastikan opsi jawaban tidak duplikat.');
                 }
-                questionToAdd.correctAnswer = questionToAdd.options[newCorrectIndex].id;
+                questionToAdd.correctAnswer = finalCorrectOption.id;
 
-            } else { // Essay
-                if (!newQuestion.essayAnswer.trim()) {
+            } else { // QuestionType.ESSAY
+                const essayAns = (newQuestion.essayAnswer || '').trim();
+                if (!essayAns) {
                     throw new Error('Kunci jawaban esai wajib diisi.');
                 }
-                questionToAdd.correctAnswer = newQuestion.essayAnswer.trim();
+                questionToAdd.correctAnswer = essayAns;
                 delete questionToAdd.options;
             }
 
+            // 3. Commit the change
             await addQuestions([questionToAdd]);
             setQuestions(prev => [questionToAdd, ...prev]);
-            setAddMessage({ type: 'success', text: 'Soal berhasil ditambahkan!' });
+            setAddMessage({ type: 'success', text: 'Soal berhasil ditambahkan ke bank soal!' });
 
             // Reset form
             setNewQuestion({
-                content: '', mediaType: QuestionMediaType.TEXT, mediaUrl: '', promptText: '',
-                type: QuestionType.MULTIPLE_CHOICE, subject: '', phase: 'F',
-                options: [{ text: '' }, { text: '' }, { text: '' }, { text: '' }, { text: '' }],
-                correctAnswerIndex: 0, essayAnswer: ''
+                content: '', 
+                mediaType: QuestionMediaType.TEXT, 
+                mediaUrl: '', 
+                promptText: '',
+                type: QuestionType.MULTIPLE_CHOICE, 
+                subject: '', 
+                phase: 'F',
+                options: [{ text: '' }, { text: '' }, { text: '' }, { text: '' }],
+                correctAnswerIndex: 0, 
+                essayAnswer: ''
             });
             setManualMediaFile(null);
             if (manualFileInputRef.current) {
@@ -366,58 +415,113 @@ const QuestionBank: React.FC = () => {
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[sheetName];
+                    
+                    // Check for required headers before parsing rows
+                    const headerRow = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] as string[];
+                    const requiredHeaders = ['content', 'type', 'subject', 'phase', 'correctAnswer'];
+                    const missingHeaders = requiredHeaders.filter(h => !headerRow?.includes(h));
+                    
+                    if (missingHeaders.length > 0) {
+                        throw new Error(`File Excel tidak memiliki kolom yang diwajibkan: ${missingHeaders.join(', ')}. Harap pastikan nama kolom di baris pertama sudah benar.`);
+                    }
+
                     const json = XLSX.utils.sheet_to_json(worksheet) as any[];
 
+                    if (json.length === 0) {
+                        throw new Error("File Excel terbaca, namun tidak ditemukan baris data soal di bawah baris judul (header).");
+                    }
+
                     const parsedQuestions: Question[] = json.map((row, index) => {
-                        const rowNum = index + 2;
-                        const requiredFields = ['content', 'type', 'subject', 'phase', 'correctAnswer'];
+                        const rowNum = index + 2; // +1 for 0-indexing, +1 for header row
                         
                         // 1. Periksa Kelengkapan Field Wajib
-                        for (const field of requiredFields) {
+                        const mandatoryFields = ['content', 'type', 'subject', 'phase', 'correctAnswer'];
+                        for (const field of mandatoryFields) {
                             const val = row[field];
                             if (val === undefined || val === null || String(val).trim() === '') {
-                                throw new Error(`[BARIS ${rowNum}] Kolom '${field}' WAJIB DIISI namun ditemukan kosong. Harap lengkapi data pada file Excel Anda.`);
+                                throw new Error(`[BARIS ${rowNum}] Kolom '${field}' tidak boleh kosong atau hanya berisi spasi. Field wajib: content, type, subject, phase, correctAnswer.`);
                             }
                         }
 
-                        // 2. Normalisasi & Validasi Tipe Soal
+                        // 2. Validasi Tipe Soal
                         const typeInput = String(row['type']).trim();
                         let type: QuestionType;
-                        if (typeInput.toLowerCase() === 'pilihan ganda' || typeInput === QuestionType.MULTIPLE_CHOICE) {
+                        const isPilihanGandaString = typeInput.toLowerCase() === 'pilihan ganda' || typeInput.toLowerCase() === 'multiple choice' || typeInput === QuestionType.MULTIPLE_CHOICE;
+                        const isEsaiString = typeInput.toLowerCase() === 'esai' || typeInput.toLowerCase() === 'essay' || typeInput === QuestionType.ESSAY;
+
+                        if (isPilihanGandaString) {
                             type = QuestionType.MULTIPLE_CHOICE;
-                        } else if (typeInput.toLowerCase() === 'esai' || typeInput === QuestionType.ESSAY) {
+                        } else if (isEsaiString) {
                             type = QuestionType.ESSAY;
                         } else {
-                            throw new Error(`[BARIS ${rowNum}] Tipe Soal '${typeInput}' TIDAK VALID. Gunakan "Pilihan Ganda" atau "Esai" (tanpa tanda petik).`);
+                            throw new Error(`[BARIS ${rowNum}] Tipe Soal '${typeInput}' tidak valid. Harus 'Pilihan Ganda' atau 'Esai'.`);
                         }
 
                         // 3. Validasi Fase
                         const phase = String(row['phase']).trim().toUpperCase();
                         if (!['D', 'E', 'F'].includes(phase)) {
-                            throw new Error(`[BARIS ${rowNum}] Fase '${phase}' TIDAK VALID. Kurikulum Merdeka hanya mendukung Fase D, E, atau F.`);
+                            throw new Error(`[BARIS ${rowNum}] Fase '${phase}' tidak valid. Harus 'D', 'E', atau 'F'.`);
                         }
 
                         // 4. Normalisasi & Validasi Tipe Media
                         let mediaType = QuestionMediaType.TEXT;
-                        if (row['mediaType']) {
-                            const mTypeInput = String(row['mediaType']).trim().toLowerCase();
-                            if (mTypeInput === 'audio' || mTypeInput === 'video' || mTypeInput === 'teks' ||
-                                Object.values(QuestionMediaType).some(v => v.toLowerCase() === mTypeInput)) {
-                                
-                                if (mTypeInput === 'audio' || mTypeInput.includes('audio')) mediaType = QuestionMediaType.AUDIO;
-                                else if (mTypeInput === 'video' || mTypeInput.includes('video')) mediaType = QuestionMediaType.VIDEO;
-                                else mediaType = QuestionMediaType.TEXT;
+                        const mediaTypeVal = row['mediaType'] || row['media_type'] || row['tipe_media'] || row['media'];
+                        if (mediaTypeVal) {
+                            const mTypeInput = String(mediaTypeVal).trim().toLowerCase();
+                            if (mTypeInput === 'audio' || mTypeInput.includes('audio')) {
+                                mediaType = QuestionMediaType.AUDIO;
+                            } else if (mTypeInput === 'video' || mTypeInput.includes('video')) {
+                                mediaType = QuestionMediaType.VIDEO;
+                            } else if (mTypeInput === 'teks' || mTypeInput === 'text' || mTypeInput.includes('text')) {
+                                mediaType = QuestionMediaType.TEXT;
                             } else {
-                                throw new Error(`[BARIS ${rowNum}] Tipe Media '${row['mediaType']}' tidak dikenali. Gunakan: Teks, Audio, atau Video.`);
+                                throw new Error(`[BARIS ${rowNum}] Tipe Media '${mediaTypeVal}' tidak dikenali. Gunakan: Teks, Audio, atau Video.`);
+                            }
+                        }
+
+                        // 5. Tentukan Content & Prompt Text berdasarkan Media Type
+                        let finalContent = '';
+                        const promptTextVal = row['promptText'] || row['prompt_text'] || row['prompt'] || row['instruction'] || row['instruksi'] || row['pengantar'] || row['pertanyaan'] || row['soal'];
+                        let finalPromptText = promptTextVal ? String(promptTextVal).trim() : undefined;
+                        
+                        if (mediaType === QuestionMediaType.TEXT) {
+                            const textVal = row['content'] || row['question'] || row['pertanyaan'] || row['soal'];
+                            if (!textVal || String(textVal).trim() === '') {
+                                throw new Error(`[BARIS ${rowNum}] Kolom 'content' (atau pertanyaan/soal) wajib diisi untuk soal tipe teks.`);
+                            }
+                            finalContent = String(textVal).trim();
+                        } else {
+                            // Untuk media, content adalah URL.
+                            // Mendukung kolom: mediaUrl, media_url, url, link, content (jika isinya URL)
+                            const mediaUrlVal = row['mediaUrl'] || row['media_url'] || row['url'] || row['link'] || row['video_url'] || row['audio_url'];
+                            const backupUrl = row['content'];
+                            
+                            const actualUrl = mediaUrlVal || (backupUrl && (String(backupUrl).startsWith('http') || String(backupUrl).startsWith('https')) ? backupUrl : null);
+                            
+                            if (!actualUrl || String(actualUrl).trim() === '') {
+                                throw new Error(`[BARIS ${rowNum}] URL Media wajib diisi (gunakan kolom 'mediaUrl', 'url', 'link' atau 'content' dengan link yang valid).`);
+                            }
+                            finalContent = String(actualUrl).trim();
+                            
+                            // Jika promptText masih kosong atau sama dengan URL, coba cari dari kolom lain
+                            if (!finalPromptText || finalPromptText === finalContent) {
+                                const contentAsPrompt = row['content'] || row['question'] || row['pertanyaan'] || row['soal'];
+                                if (contentAsPrompt && String(contentAsPrompt).trim() !== finalContent) {
+                                    finalPromptText = String(contentAsPrompt).trim();
+                                }
+                            }
+                            
+                            if (!finalPromptText || finalPromptText.trim().length < 2) {
+                                throw new Error(`[BARIS ${rowNum}] Soal media wajib memiliki instruksi/pertanyaan (gunakan kolom 'promptText', 'content', atau 'pertanyaan').`);
                             }
                         }
 
                         const question: Question = {
                             id: `imported-${Date.now()}-${index}`,
-                            content: String(row['content']).trim(),
+                            content: finalContent,
                             type,
                             mediaType,
-                            promptText: row['promptText'] ? String(row['promptText']).trim() : undefined,
+                            promptText: finalPromptText,
                             subject: String(row['subject']).trim(),
                             phase: phase as 'D' | 'E' | 'F',
                             correctAnswer: String(row['correctAnswer']).trim(),
@@ -425,8 +529,9 @@ const QuestionBank: React.FC = () => {
                         };
 
                         if (question.type === QuestionType.MULTIPLE_CHOICE) {
-                            // 5. Validasi Minimal 2 Opsi Jawaban
-                            question.options = ['A', 'B', 'C', 'D', 'E']
+                            // 5. Validasi Opsi Jawaban (Minimal 2 valid)
+                            const possibleOptions = ['A', 'B', 'C', 'D', 'E'];
+                            question.options = possibleOptions
                                 .map((opt, i) => {
                                     const optText = row[`option${opt}`];
                                     return { 
@@ -437,33 +542,35 @@ const QuestionBank: React.FC = () => {
                                 .filter(opt => opt.text !== '');
 
                             if (question.options.length < 2) {
-                                throw new Error(`[BARIS ${rowNum}] Soal Pilihan Ganda minimal harus memiliki 2 opsi. Harap isi setidaknya kolom 'optionA' dan 'optionB'.`);
+                                throw new Error(`[BARIS ${rowNum}] Soal Pilihan Ganda harus memiliki minimal 2 opsi (di kolom optionA, optionB, dst) yang tidak kosong.`);
                             }
                             
-                            // 6. Validasi Kunci Jawaban (Format Huruf A-E)
+                            // 6. Validasi Kunci Jawaban
                             const correctLetter = String(row['correctAnswer']).trim().toUpperCase();
-                            if (!['A', 'B', 'C', 'D', 'E'].includes(correctLetter)) {
-                                throw new Error(`[BARIS ${rowNum}] Kunci Jawaban '${correctLetter}' tidak valid. Untuk Pilihan Ganda, gunakan satu huruf: A, B, C, D, atau E.`);
+                            if (!possibleOptions.includes(correctLetter)) {
+                                throw new Error(`[BARIS ${rowNum}] Kunci Jawaban '${correctLetter}' tidak valid. Gunakan huruf A, B, C, D, atau E.`);
                             }
 
-                            // Pastikan kunci yang dipilih merujuk pada opsi yang ada isinya
+                            // Pastikan kunci merujuk pada kolom yang berisi teks
                             const optValueForLetter = row[`option${correctLetter}`];
                             if (!optValueForLetter || String(optValueForLetter).trim() === '') {
-                                throw new Error(`[BARIS ${rowNum}] Kunci '${correctLetter}' merujuk pada Opsi ${correctLetter} yang kosong. Harap isi teks pada kolom 'option${correctLetter}'.`);
+                                throw new Error(`[BARIS ${rowNum}] Kunci '${correctLetter}' merujuk pada kolom 'option${correctLetter}' yang kosong. Harap isi teks pada kolom tersebut.`);
                             }
 
                             const correctOptionText = String(optValueForLetter).trim();
                             const finalCorrectOption = question.options.find(opt => opt.text === correctOptionText);
 
                             if (!finalCorrectOption) {
-                                throw new Error(`[BARIS ${rowNum}] Sinkronisasi Gagal: Tidak dapat menemukan teks opsi '${correctOptionText}' di daftar opsi yang diproses.`);
+                                throw new Error(`[BARIS ${rowNum}] Sinkronisasi kunci gagal. Pastikan tidak ada duplikasi teks pada opsi.`);
                             }
                             question.correctAnswer = finalCorrectOption.id;
                         } else {
                             // 7. Validasi Kunci Jawaban Esai
-                            if (question.correctAnswer.length < 5) {
-                                throw new Error(`[BARIS ${rowNum}] Kunci Jawaban Esai terlalu pendek (minimal 5 karakter). Berikan jawaban ideal yang cukup deskriptif untuk analisis AI.`);
+                            const essayAns = String(row['correctAnswer']).trim();
+                            if (essayAns.length < 3) {
+                                throw new Error(`[BARIS ${rowNum}] Kunci Jawaban Esai ("${essayAns}") terlalu pendek. Harap berikan jawaban pedoman yang lebih lengkap.`);
                             }
+                            question.correctAnswer = essayAns;
                         }
                         return question;
                     });
@@ -482,7 +589,7 @@ const QuestionBank: React.FC = () => {
                     const arrayBuffer = e.target?.result as ArrayBuffer;
                     const { value: text } = await mammoth.extractRawText({ arrayBuffer });
                     if (!text || text.trim().length < 10) {
-                        throw new Error("File Word tampak kosong atau tidak terbaca.");
+                        throw new Error("Format teks dalam file Word tidak dapat dibaca atau file kosong. Pastikan file berisi teks soal yang benar.");
                     }
 
                     // Split dengan memastikan nomor soal tetap ada di awal setiap elemen
@@ -496,110 +603,126 @@ const QuestionBank: React.FC = () => {
                     const parsedQuestions: Question[] = questionsText.map((qText, index) => {
                         const questionNum = index + 1;
                         
-                        // 1. Ekstrak & Validasi Metadata (Subjek & Fase)
-                        const subjectMatch = qText.match(/\[SUBJEK:\s*([^\]]+)\]/i);
-                        const phaseMatch = qText.match(/\[FASE:\s*([^\]]+)\]/i);
+                        // 1. Ekstrak Metadata
+                        const subjectMatch = qText.match(/\[(SUBJEK|SUBJECT|MAPEL)\s*:\s*([^\]]*)\]/i);
+                        const phaseMatch = qText.match(/\[(FASE|PHASE)\s*:\s*([^\]]*)\]/i);
+                        const typeMatch = qText.match(/\[(TIPE|TYPE)\s*:\s*([^\]]*)\]/i);
+                        const mediaTypeMatch = qText.match(/\[(MEDIA_TYPE|TIPE_MEDIA|MEDIA)\s*:\s*([^\]]*)\]/i);
+                        const mediaUrlMatch = qText.match(/\[(MEDIA_URL|URL|LINK|CONTENT)\s*:\s*([^\]]*)\]/i);
+                        const explicitPromptMatch = qText.match(/\[(PROMPT_TEXT|PROMPT|INSTRUKSI|PENGANTAR|PERTANYAAN|SOAL)\s*:\s*([^\]]*)\]/i);
 
-                        if (!subjectMatch) {
-                            throw new Error(`[SOAL ${questionNum}] Tag metadata [SUBJEK] tidak ditemukan. Format wajib: [SUBJEK: Nama Pelajaran]`);
-                        }
-                        const subject = subjectMatch[1].trim();
+                        // 2. Validasi & Normalisasi Metadata Wajib
+                        const subject = subjectMatch && subjectMatch[2] ? subjectMatch[2].trim() : '';
                         if (!subject) {
-                            throw new Error(`[SOAL ${questionNum}] Nama pelajaran pada tag [SUBJEK] tidak boleh kosong.`);
+                            throw new Error(`[SOAL ${questionNum}] Metadata [SUBJEK] (Mapel) wajib ada dan tidak boleh kosong. Contoh: [SUBJEK: Matematika]`);
                         }
 
-                        if (!phaseMatch) {
-                            throw new Error(`[SOAL ${questionNum}] Tag metadata [FASE] tidak ditemukan. Format wajib: [FASE: D/E/F]`);
+                        const phaseRaw = phaseMatch && phaseMatch[2] ? phaseMatch[2].trim().toUpperCase() : '';
+                        if (!phaseRaw) {
+                            throw new Error(`[SOAL ${questionNum}] Metadata [FASE] wajib ada. Contoh: [FASE: F]`);
                         }
-                        const phase = phaseMatch[1].trim().toUpperCase();
-                        if (!['D', 'E', 'F'].includes(phase)) {
-                            throw new Error(`[SOAL ${questionNum}] Fase "${phase}" tidak valid. Kurikulum Merdeka hanya mendukung Fase D, E, atau F.`);
+                        if (!['D', 'E', 'F'].includes(phaseRaw)) {
+                            throw new Error(`[SOAL ${questionNum}] Fase "${phaseRaw}" tidak valid. Harus D, E, atau F.`);
                         }
+                        const phase = phaseRaw as 'D' | 'E' | 'F';
 
-                        // 2. Ekstrak Info Media (Opsional)
-                        const mediaTypeMatch = qText.match(/\[MEDIA_TYPE:\s*(.*?)\]/i);
-                        const mediaUrlMatch = qText.match(/\[MEDIA_URL:\s*(.*?)\]/i);
+                        // 3. Tipe Media & URL
                         let mediaType = QuestionMediaType.TEXT;
-                        let content = '';
-                        let promptText = '';
-
-                        if (mediaTypeMatch) {
-                            const mTypeRaw = mediaTypeMatch[1].trim().toLowerCase();
+                        if (mediaTypeMatch && mediaTypeMatch[2]) {
+                            const mTypeRaw = mediaTypeMatch[2].trim().toLowerCase();
                             if (mTypeRaw === 'audio' || mTypeRaw.includes('audio')) mediaType = QuestionMediaType.AUDIO;
                             else if (mTypeRaw === 'video' || mTypeRaw.includes('video')) mediaType = QuestionMediaType.VIDEO;
-                            else if (mTypeRaw === 'teks' || mTypeRaw.includes('text')) mediaType = QuestionMediaType.TEXT;
-                            else throw new Error(`[SOAL ${questionNum}] Tipe media "${mTypeRaw}" tidak dikenali. Gunakan Teks, Audio, atau Video.`);
+                            else if (mTypeRaw === 'teks' || mTypeRaw.includes('text') || mTypeRaw === 'text') mediaType = QuestionMediaType.TEXT;
+                            // Jika ada tag tapi isinya aneh, default ke TEXT atau throw? User minta handle kosong.
                         }
 
-                        // 3. Ekstrak Konten Utama (Soal) - Bersihkan dari tag metadata agar tidak mengganggu regex
-                        const qTextClean = qText.replace(/\[(SUBJEK|FASE|MEDIA_TYPE|MEDIA_URL):.*?\]/gi, '').trim();
-                        const contentMatch = qTextClean.match(/^\d+\.\s([\s\S]*?)(?=\s*\n[A-E]\.|\s*\nKUNCI:|$)/);
-                        const extractedContent = contentMatch ? contentMatch[1].trim() : '';
-
+                        let mediaUrl = '';
                         if (mediaType !== QuestionMediaType.TEXT) {
-                            if (!mediaUrlMatch || !mediaUrlMatch[1].trim()) {
-                                throw new Error(`[SOAL ${questionNum}] URL Media WAJIB ada jika tipe media adalah ${mediaType}. Tambahkan tag [MEDIA_URL: http://...]`);
+                            mediaUrl = mediaUrlMatch && mediaUrlMatch[2] ? mediaUrlMatch[2].trim() : '';
+                            if (!mediaUrl) {
+                                throw new Error(`[SOAL ${questionNum}] URL Media wajib ada untuk tipe ${mediaType}. Tambahkan [MEDIA_URL: http://...]`);
                             }
-                            content = mediaUrlMatch[1].trim();
-                            promptText = extractedContent;
-                            if (!promptText) throw new Error(`[SOAL ${questionNum}] Teks pengantar soal media (sebelum URL) tidak boleh kosong.`);
-                        } else {
-                            content = extractedContent;
-                            if (!content) throw new Error(`[SOAL ${questionNum}] Konten teks soal tidak ditemukan. Pastikan format nomor soal benar (Contoh: 1. Apa itu...)`);
                         }
 
-                        // 4. Ekstrak Opsi Jawaban
+                        // 4. Ekstrak Konten Utama (Teks Soal / Instruksi)
+                        const qTextClean = qText.replace(/\[(SUBJEK|SUBJECT|MAPEL|FASE|PHASE|TIPE|TYPE|MEDIA_TYPE|TIPE_MEDIA|MEDIA|MEDIA_URL|URL|LINK|CONTENT|PROMPT_TEXT|PROMPT|INSTRUKSI|PENGANTAR|PERTANYAAN|SOAL):.*?\]/gi, '').trim();
+                        const contentMatch = qTextClean.match(/^\d+\.\s([\s\S]*?)(?=\s*\n[A-E]\.|\s*\nKUNCI:|$)/);
+                        const extractedBody = contentMatch ? contentMatch[1].trim() : '';
+
+                        let content = '';
+                        let promptText: string | undefined = undefined;
+
+                        if (mediaType === QuestionMediaType.TEXT) {
+                            content = extractedBody;
+                            if (!content || content.length < 3) {
+                                throw new Error(`[SOAL ${questionNum}] Konten pertanyaan teks terlalu pendek atau kosong.`);
+                            }
+                        } else {
+                            content = mediaUrl;
+                            const pText = explicitPromptMatch && explicitPromptMatch[2] ? explicitPromptMatch[2].trim() : extractedBody;
+                            promptText = pText || '';
+                            if (!promptText || promptText.length < 3) {
+                                throw new Error(`[SOAL ${questionNum}] Soal media wajib memiliki teks pertanyaan/instruksi.`);
+                            }
+                        }
+
+                        // 5. Opsi & Kunci
                         const optionsMatches = [...qText.matchAll(/([A-E])\.\s(.*?)(?=\s*\n[A-E]\.|\nKUNCI:|\s*\[|$)/gs)];
-                        const options: QuestionOption[] = optionsMatches.map((match, i) => ({ 
-                            id: `imported-${Date.now()}-${index}-o${i + 1}`, 
-                            text: match[2].trim() 
-                        }));
-                        
-                        const type = options.length > 0 ? QuestionType.MULTIPLE_CHOICE : QuestionType.ESSAY;
+                        const rawOptions = optionsMatches.map((match) => ({
+                            letter: match[1].toUpperCase(),
+                            text: match[2].trim()
+                        })).filter(opt => opt.text !== '');
+
+                        let type: QuestionType;
+                        if (typeMatch && typeMatch[2]) {
+                            const typeRaw = typeMatch[2].trim().toLowerCase();
+                            if (typeRaw === 'pilihan ganda' || typeRaw.includes('choice')) type = QuestionType.MULTIPLE_CHOICE;
+                            else if (typeRaw === 'esai' || typeRaw === 'essay') type = QuestionType.ESSAY;
+                            else type = rawOptions.length > 0 ? QuestionType.MULTIPLE_CHOICE : QuestionType.ESSAY;
+                        } else {
+                            type = rawOptions.length > 0 ? QuestionType.MULTIPLE_CHOICE : QuestionType.ESSAY;
+                        }
+
                         let correctAnswer = '';
+                        let finalOptions: QuestionOption[] | undefined = undefined;
 
                         if (type === QuestionType.MULTIPLE_CHOICE) {
-                            // 5. Validasi Minimal 2 Opsi
-                            if (options.length < 2) {
-                                throw new Error(`[SOAL ${questionNum}] Soal Pilihan Ganda minimal harus memiliki 2 opsi (A. ... dan B. ...).`);
+                            if (rawOptions.length < 2) {
+                                throw new Error(`[SOAL ${questionNum}] Soal Pilihan Ganda minimal butuh 2 opsi (A, B, ...).`);
                             }
-                            
-                            // 6. Validasi Kunci Jawaban (MC)
-                            const correctAnswerMatch = qText.match(/KUNCI:\s*([A-E])/i);
-                            if (!correctAnswerMatch) {
-                                throw new Error(`[SOAL ${questionNum}] Kunci jawaban pilihan ganda tidak ditemukan. Gunakan format "KUNCI: A" (tanpa tanda petik).`);
+                            const kunciMatch = qText.match(/KUNCI\s*:\s*([A-E])/i);
+                            if (!kunciMatch) {
+                                throw new Error(`[SOAL ${questionNum}] Kunci jawaban (KUNCI: A/B/...) tidak ditemukan.`);
                             }
-                            
-                            const correctLetter = correctAnswerMatch[1].toUpperCase();
-                            const correctIndex = ['A', 'B', 'C', 'D', 'E'].indexOf(correctLetter);
-                            if (correctIndex === -1 || !options[correctIndex]) {
-                                throw new Error(`[SOAL ${questionNum}] Kunci jawaban "${correctLetter}" merujuk pada opsi yang tidak ada dalam dokumen.`);
+                            const correctLetter = kunciMatch[1].toUpperCase();
+                            const matchingOpt = rawOptions.find(opt => opt.letter === correctLetter);
+                            if (!matchingOpt) {
+                                throw new Error(`[SOAL ${questionNum}] Kunci "${correctLetter}" merujuk pada opsi yang kosong.`);
                             }
-                            correctAnswer = options[correctIndex].id;
+                            finalOptions = rawOptions.map((opt, i) => ({ 
+                                id: `imported-${Date.now()}-${index}-o${i + 1}`, 
+                                text: opt.text 
+                            }));
+                            correctAnswer = finalOptions[rawOptions.findIndex(opt => opt.letter === correctLetter)].id;
                         } else {
-                            // 7. Validasi Kunci Jawaban (Esai)
-                            const essayAnswerMatch = qText.match(/KUNCI:\s*([\s\S]*?)(?=\s*\n\[|$)/i);
-                            if (!essayAnswerMatch || !essayAnswerMatch[1].trim()) {
-                                throw new Error(`[SOAL ${questionNum}] Kunci jawaban esai tidak ditemukan. Gunakan format "KUNCI: Teks Jawaban Ideal".`);
-                            }
-                            correctAnswer = essayAnswerMatch[1].trim();
-                            if (correctAnswer.length < 5) {
-                                throw new Error(`[SOAL ${questionNum}] Kunci jawaban esai terlalu pendek (minimal 5 karakter) untuk analisis AI.`);
+                            const essayMatch = qText.match(/KUNCI\s*:\s*([\s\S]*?)(?=\s*\n\[|$)/i);
+                            correctAnswer = essayMatch && essayMatch[1] ? essayMatch[1].trim() : '';
+                            if (!correctAnswer || correctAnswer.length < 3) {
+                                throw new Error(`[SOAL ${questionNum}] Kunci jawaban esai wajib ada dan valid (minimal 3 karakter).`);
                             }
                         }
 
-                        const finalQuestion: Question = { 
+                        return { 
                             id: `imported-${Date.now()}-${index}`, 
                             content, 
-                            options: type === QuestionType.MULTIPLE_CHOICE ? options : undefined, 
+                            options: finalOptions, 
                             type, 
                             mediaType,
-                            promptText: mediaType !== QuestionMediaType.TEXT ? promptText : undefined,
+                            promptText,
                             correctAnswer, 
                             subject, 
-                            phase: phase as 'D' | 'E' | 'F' 
-                        };
-                        return finalQuestion;
+                            phase 
+                        } as Question;
                     });
                     resolve(parsedQuestions);
                 } catch (err: any) { reject(err); }
@@ -608,27 +731,32 @@ const QuestionBank: React.FC = () => {
         });
     };
 
-    if (selectedQuestionId) {
-        return <QuestionDetail questionId={selectedQuestionId} onBack={() => setSelectedQuestionId(null)} />;
-    }
-
     return (
-        <div>
-            {editingQuestionId && (
-                <EditQuestionModal
-                    questionId={editingQuestionId}
-                    onClose={() => setEditingQuestionId(null)}
-                    onQuestionUpdated={handleQuestionUpdated}
-                />
-            )}
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-4">Bank Soal</h2>
+        <div className="space-y-6">
+            {selectedQuestionId ? (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <QuestionDetail 
+                        questionId={selectedQuestionId} 
+                        onBack={() => setSelectedQuestionId(null)} 
+                    />
+                </div>
+            ) : (
+                <>
+                    {editingQuestionId && (
+                        <EditQuestionModal
+                            questionId={editingQuestionId}
+                            onClose={() => setEditingQuestionId(null)}
+                            onQuestionUpdated={handleQuestionUpdated}
+                        />
+                    )}
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-4">Bank Soal</h2>
 
-            <div className="flex border-b border-white/20 dark:border-slate-700/50 mb-6">
-                <TabButton name="import" activeTab={activeTab} setActiveTab={setActiveTab}>Impor Massal</TabButton>
-                <TabButton name="add" activeTab={activeTab} setActiveTab={setActiveTab}>Tambah Manual</TabButton>
-            </div>
-            
-            {activeTab === 'import' && (
+                    <div className="flex border-b border-white/20 dark:border-slate-700/50 mb-6">
+                        <TabButton name="import" activeTab={activeTab} setActiveTab={setActiveTab}>Impor Massal</TabButton>
+                        <TabButton name="add" activeTab={activeTab} setActiveTab={setActiveTab}>Tambah Manual</TabButton>
+                    </div>
+                    
+                    {activeTab === 'import' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                     <div className="bg-white/30 dark:bg-slate-900/50 p-6 rounded-lg">
                         <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-4">Impor Soal Baru</h3>
@@ -678,7 +806,7 @@ const QuestionBank: React.FC = () => {
                                 )}
                                 <div className="flex-1">
                                     <h4 className="font-bold text-base mb-1">
-                                        {importMessage.type === 'success' ? 'Impor Selesai' : 'Terjadi Kesalahan'}
+                                        {importMessage.type === 'success' ? 'Impor Berhasil' : 'Terjadi Kesalahan'}
                                     </h4>
                                     <p className="text-current opacity-90 text-sm">{importMessage.text}</p>
                                 </div>
@@ -690,14 +818,17 @@ const QuestionBank: React.FC = () => {
                         <div className="prose prose-sm dark:prose-invert max-w-none">
                             <p><strong>Format Teks:</strong></p>
                             <ul>
-                                <li><strong>Excel (.xlsx):</strong> Kolom <code>content</code> diisi teks soal. Kolom <code>mediaType</code> diisi "Teks".</li>
-                                <li><strong>Word (.docx):</strong> Tulis soal seperti biasa. Setiap soal WAJIB memiliki tag <code>[SUBJEK: ...]</code> dan <code>[FASE: ...]</code>.</li>
+                                <li><strong>Excel (.xlsx):</strong> Kolom <code>content</code> (atau <code>pertanyaan</code>/<code>soal</code>) diisi teks soal. Kolom <code>mediaType</code> (opsional) diisi "Teks".</li>
+                                <li><strong>Word (.docx):</strong> Gunakan penomoran (contoh: <code>1. Soal ini...</code>). Setiap soal WAJIB memiliki tag <code>[SUBJEK: ...]</code> dan <code>[FASE: ...]</code>.</li>
                             </ul>
                              <p><strong>Format Audio/Video:</strong></p>
                             <ul>
-                                <li><strong>Excel (.xlsx):</strong> Kolom <code>mediaType</code> diisi "Audio" atau "Video". Kolom <code>content</code> diisi URL media. Kolom <code>promptText</code> diisi teks pengantar.</li>
-                                <li><strong>Word (.docx):</strong> Gunakan tag <code>[MEDIA_TYPE: Video]</code>, <code>[MEDIA_URL: http://...]</code>. Tag <code>[SUBJEK]</code> dan <code>[FASE]</code> tetap wajib ada di setiap soal.</li>
+                                <li><strong>Excel (.xlsx):</strong> Kolom <code>mediaType</code> diisi "Audio" atau "Video". Kolom <code>mediaUrl</code> (atau <code>url</code>/<code>link</code>) diisi link media. Kolom <code>promptText</code> (atau <code>pengantar</code>) diisi teks instruksi.</li>
+                                <li><strong>Word (.docx):</strong> Tambahkan tag <code>[MEDIA_TYPE: Video]</code> dan <code>[MEDIA_URL: http://...]</code>. Gunakan <code>[PROMPT_TEXT: ...]</code> jika ingin memisahkan instruksi dari konten utama.</li>
                             </ul>
+                            <p className="text-[10px] opacity-75 mt-2 italic">
+                                * Berbagai sinonim didukung (contoh: [SUBJECT], [MAPEL], [URL], [INSTRUKSI]) untuk kemudahan penulisan.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -712,7 +843,7 @@ const QuestionBank: React.FC = () => {
                             <select 
                                 value={newQuestion.mediaType} 
                                 onChange={(e) => handleNewQuestionChange('mediaType', e.target.value as QuestionMediaType)} 
-                                className="w-full md:w-1/3 bg-white/40 dark:bg-slate-800/50 border border-slate-300/80 dark:border-slate-700/80 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 transition-all"
+                                className="w-full md:w-1/3 bg-white/40 dark:bg-slate-800/50 border border-slate-300/80 dark:border-slate-700/80 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 transition-all text-slate-900 dark:text-white"
                             >
                                 <option value={QuestionMediaType.TEXT}>Teks</option>
                                 <option value={QuestionMediaType.AUDIO}>Audio</option>
@@ -722,9 +853,9 @@ const QuestionBank: React.FC = () => {
 
                         {newQuestion.mediaType === QuestionMediaType.TEXT ? (
                             <div className="space-y-2">
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Konten Soal (Teks)</label>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Konten Pertanyaan</label>
                                 <textarea
-                                    placeholder="Tulis konten soal di sini..."
+                                    placeholder="Tulis pertanyaan teks di sini..."
                                     rows={4}
                                     value={newQuestion.content}
                                     onChange={(e) => handleNewQuestionChange('content', e.target.value)}
@@ -732,47 +863,96 @@ const QuestionBank: React.FC = () => {
                                 />
                             </div>
                         ) : (
-                            <div className='space-y-4 pt-2'>
-                                <div className="flex flex-col md:flex-row gap-4 items-end">
-                                    <div className="flex-grow w-full">
-                                        <Input 
-                                            label={`URL Media ${newQuestion.mediaType} (Google Drive / YouTube)`}
-                                            value={newQuestion.mediaUrl} 
-                                            onChange={(e) => handleNewQuestionChange('mediaUrl', e.target.value)} 
-                                            placeholder="https://..."
-                                            disabled={!!manualMediaFile}
-                                        />
-                                    </div>
-                                    <div className="flex-shrink-0 mb-4">
-                                        <input 
-                                            type="file" 
-                                            ref={manualFileInputRef} 
-                                            className="hidden" 
-                                            onChange={handleManualFileChange}
-                                            accept={newQuestion.mediaType === QuestionMediaType.AUDIO ? "audio/*" : "video/*"}
-                                        />
-                                        {manualMediaFile ? (
-                                            <Button type="button" variant="secondary" onClick={handleClearManualFile} className="flex items-center gap-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                                Hapus
-                                            </Button>
-                                        ) : (
-                                            <Button type="button" variant="secondary" onClick={() => manualFileInputRef.current?.click()}>
-                                                Unggah File
-                                            </Button>
-                                        )}
+                            <div className='space-y-6 pt-2 border-t border-slate-200 dark:border-slate-700/50 mt-2'>
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                                    <div className="md:col-span-12">
+                                        <div className="flex flex-col md:flex-row items-center gap-4">
+                                            <div className="flex-grow w-full">
+                                                <Input 
+                                                    label={`URL Media ${newQuestion.mediaType}`}
+                                                    value={newQuestion.mediaUrl} 
+                                                    onChange={(e) => handleNewQuestionChange('mediaUrl', e.target.value)} 
+                                                    placeholder={`Masukkan URL ${newQuestion.mediaType} (contoh: YouTube, Google Drive, atau link langsung)...`}
+                                                    disabled={!!manualMediaFile}
+                                                    className="!mb-0"
+                                                />
+                                            </div>
+                                            
+                                            <div className="flex items-center gap-4 w-full md:w-auto self-end h-11">
+                                                <div className="flex-shrink-0 text-slate-400 font-bold text-xs uppercase hidden md:block">Atau</div>
+                                                <div className="md:hidden w-full flex items-center gap-2">
+                                                    <div className="h-px bg-slate-200 dark:bg-slate-700 flex-grow"></div>
+                                                    <span className="text-xs font-bold text-slate-400 uppercase">Atau</span>
+                                                    <div className="h-px bg-slate-200 dark:bg-slate-700 flex-grow"></div>
+                                                </div>
+
+                                                <div className="flex-shrink-0 w-full md:w-auto">
+                                                    <input 
+                                                        type="file" 
+                                                        ref={manualFileInputRef} 
+                                                        className="hidden" 
+                                                        onChange={handleManualFileChange}
+                                                        accept={newQuestion.mediaType === QuestionMediaType.AUDIO ? "audio/*" : "video/*"}
+                                                    />
+                                                    {manualMediaFile ? (
+                                                        <Button type="button" variant="secondary" onClick={handleClearManualFile} className="w-full flex items-center justify-center gap-2 whitespace-nowrap">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                            Hapus File
+                                                        </Button>
+                                                    ) : (
+                                                        <Button type="button" variant="secondary" onClick={() => manualFileInputRef.current?.click()} className="w-full flex items-center justify-center gap-2 whitespace-nowrap">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" /></svg>
+                                                            Unggah File
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p className="mt-2 text-[10px] text-slate-500 italic">
+                                            Tips: Gunakan URL YouTube atau Google Drive (yang dipublikasikan) untuk video berdurasi panjang agar loading lebih cepat.
+                                        </p>
                                     </div>
                                 </div>
+
                                 <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Teks Pengantar</label>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Teks Pengantar / Pertanyaan</label>
                                     <textarea
-                                        placeholder={`Tulis teks pengantar untuk ${newQuestion.mediaType.toLowerCase()} di sini (misal: 'Perhatikan ${newQuestion.mediaType.toLowerCase()} berikut untuk menjawab...')`}
+                                        placeholder={`Tulis instruksi atau pertanyaan yang akan muncul di atas media ${newQuestion.mediaType.toLowerCase()}...`}
                                         rows={3}
                                         value={newQuestion.promptText}
                                         onChange={(e) => handleNewQuestionChange('promptText', e.target.value)}
-                                        className="w-full bg-white/40 dark:bg-slate-800/50 border border-slate-300/80 dark:border-slate-700/80 rounded-lg text-slate-900 dark:text-white placeholder-slate-500 p-3 focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full bg-white/40 dark:bg-slate-800/50 border border-slate-300/80 dark:border-slate-700/80 rounded-lg text-slate-900 dark:text-white placeholder-slate-500 p-3 focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm font-medium"
                                     />
                                 </div>
+
+                                {/* Media Preview for Manual Add */}
+                                {(manualMediaFile || (newQuestion.mediaUrl && newQuestion.mediaUrl.trim().length > 5)) && (
+                                    <div className="p-4 bg-slate-50/50 dark:bg-slate-800/20 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pratinjau Media</span>
+                                        </div>
+                                        <div className="flex justify-center bg-black/5 dark:bg-black/20 rounded-lg overflow-hidden border border-slate-100 dark:border-slate-800">
+                                            {newQuestion.mediaType === QuestionMediaType.AUDIO ? (
+                                                <div className="w-full p-6 flex flex-col items-center">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-indigo-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" /></svg>
+                                                    <p className="text-xs text-slate-500 mb-2">{manualMediaFile ? manualMediaFile.name : 'Media URL Audio'}</p>
+                                                    <div className="text-[10px] text-amber-500 italic bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded">
+                                                        Media akan diputar di panel siswa saat ujian berlangsung.
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="w-full aspect-video flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-900 p-8">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-slate-300 dark:text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                                    <p className="text-xs font-mono text-slate-500 break-all text-center max-w-xs">{manualMediaFile ? manualMediaFile.name : newQuestion.mediaUrl}</p>
+                                                    <div className="mt-4 text-[10px] font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-full border border-indigo-100 dark:border-indigo-800">
+                                                        Siap Diintegrasikan
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                        
@@ -854,7 +1034,21 @@ const QuestionBank: React.FC = () => {
                             {isAdding && <Spinner size="small" />}
                             {isAdding ? "Menyimpan..." : "Simpan Soal"}
                         </Button>
-                         {addMessage && <p className={`mt-4 text-sm font-medium p-3 rounded-lg ${addMessage.type === 'success' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'}`}>{addMessage.text}</p>}
+                        {addMessage && (
+                            <div className={`mt-4 p-4 rounded-lg flex items-start gap-3 ${addMessage.type === 'success' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'}`}>
+                                {addMessage.type === 'success' ? (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                ) : (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                )}
+                                <div className="flex-1">
+                                    <h4 className="font-bold text-base mb-1">
+                                        {addMessage.type === 'success' ? 'Simpan Berhasil' : 'Terjadi Kesalahan'}
+                                    </h4>
+                                    <p className="text-current opacity-90 text-sm">{addMessage.text}</p>
+                                </div>
+                            </div>
+                        )}
                      </div>
                  </div>
             )}
@@ -907,27 +1101,54 @@ const QuestionBank: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="max-h-96 overflow-y-auto bg-white/30 dark:bg-slate-900/50 p-4 rounded-lg">
+                <div className="max-h-96 overflow-y-auto bg-white/30 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-inner">
                     {filteredQuestions.length > 0 ? (
                         <ul className="space-y-3">
-                            {filteredQuestions.map((q, index) => (
-                                <li key={q.id} className="flex items-center justify-between p-2 bg-white/50 dark:bg-slate-800/60 rounded-md text-sm hover:bg-white/80 dark:hover:bg-slate-800 transition-colors">
-                                    <button 
-                                        onClick={() => setSelectedQuestionId(q.id)}
-                                        className="flex-grow text-left p-2"
-                                    >
-                                        <strong className="text-indigo-700 dark:text-indigo-400">{filteredQuestions.length - index}. ({q.subject} - {q.phase})</strong>
-                                        <p className="mt-1 truncate text-slate-800 dark:text-slate-200">{q.mediaType === QuestionMediaType.TEXT ? q.content : q.promptText}</p>
-                                    </button>
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); setEditingQuestionId(q.id); }}
-                                        className="ml-4 p-2 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
-                                        title="Edit Soal"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-600 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                    </button>
-                                </li>
-                            )).reverse()}
+                            {[...filteredQuestions].reverse().map((q, revIndex) => {
+                                const originalIndex = filteredQuestions.length - 1 - revIndex;
+                                const displayIndex = filteredQuestions.length - originalIndex;
+                                
+                                return (
+                                    <li key={q.id} className="group flex items-stretch bg-white/60 dark:bg-slate-800/60 rounded-xl border border-white dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 hover:shadow-md transition-all duration-200 overflow-hidden">
+                                        <button 
+                                            onClick={() => setSelectedQuestionId(q.id)}
+                                            className="flex-grow text-left p-4 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                                            title="Klik untuk melihat detail soal"
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-xs font-bold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded">
+                                                    #{displayIndex}
+                                                </span>
+                                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/50 px-1.5 py-0.5 rounded">
+                                                    {q.subject} • Fase {q.phase}
+                                                </span>
+                                                {q.mediaType !== QuestionMediaType.TEXT && (
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                        {q.mediaType === QuestionMediaType.VIDEO ? (
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                                        ) : (
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15L4 14.414V9.586L5.586 9H10l5 5v5l-5-4H5.586z" /></svg>
+                                                        )}
+                                                        {q.mediaType}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-slate-800 dark:text-slate-200 line-clamp-2 text-sm">
+                                                {q.mediaType === QuestionMediaType.TEXT ? q.content : q.promptText}
+                                            </p>
+                                        </button>
+                                        <div className="flex flex-col border-l border-slate-200 dark:border-slate-700/50">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); setEditingQuestionId(q.id); }}
+                                                className="p-4 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
+                                                title="Edit Soal"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                            </button>
+                                        </div>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     ) : (
                         <div className="text-center py-12">
@@ -938,7 +1159,9 @@ const QuestionBank: React.FC = () => {
                     )}
                 </div>
             </div>
-        </div>
+        </>
+    )}
+</div>
     );
 };
 

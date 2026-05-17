@@ -3,15 +3,15 @@ import React from 'react';
 
 const AuroraBackground: React.FC = () => {
   return (
-    <div className="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-700">
-      {/* Dynamic Blobs */}
-      <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-fuchsia-400/40 dark:bg-purple-600/20 rounded-full aurora-blur"></div>
-      <div className="absolute top-[10%] right-[-20%] w-[60%] h-[60%] bg-sky-400/40 dark:bg-indigo-600/20 rounded-full aurora-blur" style={{ animationDelay: '-5s', animationDuration: '25s' }}></div>
-      <div className="absolute bottom-[-15%] left-[5%] w-[55%] h-[55%] bg-indigo-500/40 dark:bg-blue-700/20 rounded-full aurora-blur" style={{ animationDelay: '-10s', animationDuration: '22s' }}></div>
-      <div className="absolute bottom-[20%] right-[10%] w-[45%] h-[45%] bg-teal-400/40 dark:bg-emerald-600/20 rounded-full aurora-blur" style={{ animationDelay: '-15s', animationDuration: '18s' }}></div>
+    <div className="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-700">
+      {/* Soft Ethereal Blobs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-200/40 dark:bg-indigo-500/20 rounded-full aurora-blur"></div>
+      <div className="absolute top-[20%] right-[-15%] w-[50%] h-[50%] bg-sky-200/40 dark:bg-sky-500/20 rounded-full aurora-blur" style={{ animationDelay: '-5s', animationDuration: '30s' }}></div>
+      <div className="absolute bottom-[-10%] left-[10%] w-[50%] h-[50%] bg-violet-200/40 dark:bg-violet-600/20 rounded-full aurora-blur" style={{ animationDelay: '-12s', animationDuration: '35s' }}></div>
+      <div className="absolute bottom-[10%] right-[5%] w-[40%] h-[40%] bg-emerald-100/40 dark:bg-emerald-500/10 rounded-full aurora-blur" style={{ animationDelay: '-8s', animationDuration: '28s' }}></div>
       
-      {/* Additional Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-white/10 dark:bg-transparent pointer-events-none"></div>
+      {/* Gentle Grain overlay for texture */}
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
     </div>
   );
 };

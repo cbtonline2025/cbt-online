@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Exam, Question, StudentAnswer, ExamResult } from '../../types';
+import { Exam, Question, StudentAnswer, ExamResult, User } from '../../types';
 import { fetchExamDetails } from '../../services/api';
 import Spinner from '../ui/Spinner';
 import QuestionPanel from './QuestionPanel';
@@ -11,9 +11,10 @@ import { useAntiCheat } from '../../hooks/useAntiCheat';
 interface ExamInterfaceProps {
   examId: string;
   onFinishExam: (result: ExamResult) => void;
+  user: User;
 }
 
-const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam }) => {
+const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, user }) => {
   const [exam, setExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<StudentAnswer[]>([]);
@@ -21,12 +22,26 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam }) =
   const [isLoading, setIsLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState(0);
 
-  const handleAntiCheat = useCallback((type: string) => {
-    console.log(`Pelanggaran terdeteksi: ${type}`);
-    // You could show a warning popup here.
+  const [violationMessage, setViolationMessage] = useState<string | null>(null);
+
+  const handleAntiCheat = useCallback((type: 'visibility' | 'blur') => {
+    const msg = type === 'visibility' ? 'Deteksi Perpindahan Tab' : 'Deteksi Keluar Jendela';
+    console.warn(`[ANTI-CHEAT LOG] Pelanggaran terdeteksi: ${msg} pada ${new Date().toLocaleTimeString()}`);
+    setViolationMessage(`Peringatan: Jangan meninggalkan halaman ujian! (${msg})`);
+    
+    // Auto-clear message after 5 seconds
+    setTimeout(() => setViolationMessage(null), 5000);
   }, []);
 
-  const { warnings } = useAntiCheat(handleAntiCheat, 3);
+  const { warnings, isDisqualified } = useAntiCheat(handleAntiCheat, 3);
+
+  // Handle disqualification
+  useEffect(() => {
+    if (isDisqualified) {
+      console.error("[ANTI-CHEAT LOG] Siswa didiskualifikasi karena terlalu banyak pelanggaran.");
+      handleSubmit(true, "Diskualifikasi: Terlalu banyak pelanggaran anti-cheat.");
+    }
+  }, [isDisqualified]);
 
   const shuffleArray = <T,>(array: T[]): T[] => {
     return [...array].sort(() => Math.random() - 0.5);
@@ -65,7 +80,7 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam }) =
     setAnswers(prev => prev.map(a => a.questionId === questionId ? { ...a, isDoubtful: !a.isDoubtful } : a));
   };
   
-  const handleSubmit = useCallback((isAutoSubmit: boolean = false) => {
+  const handleSubmit = useCallback((isAutoSubmit: boolean = false, reason?: string) => {
     if(!exam) return;
 
     const confirmSubmit = () => {
@@ -78,7 +93,7 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam }) =
 
         const result: ExamResult = {
             examId: exam.id,
-            studentId: 'current-student-id', // from auth context in real app
+            studentId: user.id,
             score: score,
             answers: answers,
             startedAt: new Date(Date.now() - exam.durationMinutes * 60 * 1000), // Approximate start time
@@ -88,12 +103,16 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam }) =
     }
     
     if(isAutoSubmit) {
-        alert("Waktu habis! Ujian akan diselesaikan secara otomatis.");
+        if (reason) {
+          alert(reason);
+        } else {
+          alert("Waktu habis! Ujian akan diselesaikan secara otomatis.");
+        }
         confirmSubmit();
     } else if (window.confirm("Apakah Anda yakin ingin menyelesaikan ujian ini?")) {
         confirmSubmit();
     }
-  }, [exam, answers, onFinishExam, questions]);
+  }, [exam, answers, onFinishExam, questions, user.id]);
 
   if (isLoading) {
     return (
@@ -119,9 +138,23 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam }) =
   };
 
   return (
-    <div className="w-full h-[95vh] max-w-7xl flex flex-col md:flex-row gap-6 bg-white/30 dark:bg-slate-900/30 backdrop-blur-2xl p-4 rounded-2xl shadow-lg border border-white/40 dark:border-slate-700/50">
-        <div className="flex-grow flex flex-col bg-white/40 dark:bg-slate-800/50 rounded-lg p-6">
-            <div className="flex-grow overflow-y-auto pr-2">
+    <div className="w-full h-[95vh] max-w-7xl flex flex-col md:flex-row gap-8 bg-transparent p-2 relative">
+        {/* Anti-Cheat Alert Overlay */}
+        {violationMessage && (
+            <div className="fixed top-10 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border-2 border-white/20 backdrop-blur-xl">
+                    <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center animate-pulse">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M8.257 3.099c.365-.796 1.485-.796 1.85 0l6.323 13.79c.366.798-.223 1.71-1.125 1.71H4.695c-.902 0-1.491-.912-1.125-1.71l6.323-13.79zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                    </div>
+                    <p className="font-black text-sm uppercase tracking-widest">{violationMessage}</p>
+                </div>
+            </div>
+        )}
+
+        <div className="flex-grow flex flex-col glass-card border-slate-100 p-10 overflow-hidden">
+            <div className="flex-grow overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-slate-200">
                 {currentQuestion && currentAnswer && (
                     <QuestionPanel 
                         question={currentQuestion}
@@ -133,37 +166,64 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam }) =
                     />
                 )}
             </div>
-            <div className="flex justify-between items-center mt-4 pt-4 border-t border-white/50 dark:border-slate-700">
+            <div className="flex justify-between items-center mt-10 pt-8 border-t border-slate-50">
                 <Button 
                     onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
                     disabled={currentQuestionIndex === 0}
                     variant="secondary"
+                    className="rounded-xl px-8 py-3 font-bold text-xs uppercase tracking-widest bg-white border-slate-200 hover:bg-slate-50 disabled:opacity-30"
                 >
                     Sebelumnya
                 </Button>
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Progress</span>
+                    <div className="h-1 w-32 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-indigo-500 transition-all duration-300" 
+                          style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+                        ></div>
+                    </div>
+                </div>
                 <Button 
                     onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
                     disabled={currentQuestionIndex === questions.length - 1}
+                    className="rounded-xl px-10 py-3 font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-200 active:scale-95 transition-all disabled:opacity-30"
                 >
                     Selanjutnya
                 </Button>
             </div>
         </div>
 
-        <div className="w-full md:w-80 flex-shrink-0 flex flex-col gap-4">
-            <div className="bg-white/40 dark:bg-slate-800/50 rounded-lg p-4 text-center">
-                <p className="text-slate-600 dark:text-slate-300">Sisa Waktu</p>
-                <p className={`text-3xl font-bold tracking-wider ${timeLeft < 300 ? 'text-red-600 animate-pulse' : 'text-indigo-600 dark:text-yellow-300'}`}>{formatTime(timeLeft)}</p>
-                <p className={`text-xs mt-2 font-semibold transition-colors ${warnings > 0 ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>Peringatan Pelanggaran: {warnings} / 3</p>
+        <div className="w-full md:w-96 flex-shrink-0 flex flex-col gap-6">
+            <div className="glass-card border-indigo-50 bg-indigo-50/20 p-8 text-center ring-4 ring-white/50">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Sisa Waktu Pengerjaan</p>
+                <div className={`text-4xl font-black tabular-nums tracking-tighter ${timeLeft < 300 ? 'text-rose-500 animate-pulse' : 'text-slate-900'}`}>{formatTime(timeLeft)}</div>
+                
+                <div className="mt-8 pt-6 border-t border-slate-200/50">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Integritas</span>
+                        <span className={`text-[10px] font-black uppercase ${warnings > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{warnings}/3 Peringatan</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-slate-200/50 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all duration-500 ${warnings >= 2 ? 'bg-rose-500' : 'bg-emerald-500'}`} 
+                          style={{ width: `${(warnings / 3) * 100}%` }}
+                        ></div>
+                    </div>
+                </div>
             </div>
-            <NavigationPanel
-                questions={questions}
-                answers={answers}
-                currentQuestionIndex={currentQuestionIndex}
-                onSelectQuestion={setCurrentQuestionIndex}
-            />
-            <Button onClick={() => handleSubmit(false)} variant="danger" className="mt-auto">
-                Selesaikan Ujian
+            
+            <div className="flex-grow flex flex-col overflow-hidden">
+                <NavigationPanel
+                    questions={questions}
+                    answers={answers}
+                    currentQuestionIndex={currentQuestionIndex}
+                    onSelectQuestion={setCurrentQuestionIndex}
+                />
+            </div>
+
+            <Button onClick={() => handleSubmit(false)} variant="danger" className="w-full h-16 rounded-2xl text-sm font-black uppercase tracking-[0.2em] bg-slate-900 border-none hover:bg-rose-600 shadow-xl active:scale-95 transition-all">
+                AKSES SELESAI
             </Button>
         </div>
     </div>

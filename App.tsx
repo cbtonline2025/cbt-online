@@ -96,12 +96,25 @@ const App: React.FC = () => {
   
   const returnToDashboard = useCallback(() => {
       setLastExamResult(null);
-      if(currentUser?.role === Role.STUDENT) {
-          setCurrentView(View.STUDENT_DASHBOARD);
-      } else {
-          logout(); // Fallback to login if something is wrong
+      if (!currentUser) {
+          setCurrentView(View.LOGIN);
+          return;
       }
-  }, [currentUser, logout]);
+
+      switch (currentUser.role) {
+          case Role.STUDENT:
+              setCurrentView(View.STUDENT_DASHBOARD);
+              break;
+          case Role.TEACHER:
+              setCurrentView(View.TEACHER_DASHBOARD);
+              break;
+          case Role.ADMIN:
+              setCurrentView(View.ADMIN_DASHBOARD);
+              break;
+          default:
+              setCurrentView(View.LOGIN);
+      }
+  }, [currentUser]);
 
 
   const authContextValue = useMemo(() => ({
@@ -128,7 +141,7 @@ const App: React.FC = () => {
         return currentUser && <AdminDashboard user={currentUser} logout={logout} />;
         
       case View.EXAM_SESSION:
-        return activeExamId && <ExamInterface examId={activeExamId} onFinishExam={finishExam} />;
+        return activeExamId && currentUser && <ExamInterface examId={activeExamId} onFinishExam={finishExam} user={currentUser} />;
       case View.EXAM_END_SCREEN:
         return lastExamResult && <ExamEndScreen result={lastExamResult} onReturnToDashboard={returnToDashboard} />;
 
@@ -139,16 +152,16 @@ const App: React.FC = () => {
 
   return (
     <AuthContext.Provider value={authContextValue}>
-      <div className={`relative min-h-screen w-full bg-gray-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 overflow-hidden transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
+      <div className={`relative min-h-screen w-full bg-[#F8FAFC] dark:bg-[#020617] text-slate-800 dark:text-slate-200 overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark' : ''}`}>
         <AuroraBackground />
         
         {/* Global Header */}
-        <header className="relative z-20 w-full px-6 py-4 flex justify-between items-center bg-white/10 dark:bg-slate-950/20 backdrop-blur-md border-b border-white/20 dark:border-white/5">
+        <header className="relative z-20 w-full px-6 py-4 flex justify-between items-center bg-white/40 backdrop-blur-md border-b border-white/60 shadow-sm">
           <Logo showAuthor={true} />
           <ThemeToggle isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
         </header>
 
-        <main className="relative z-10 flex items-center justify-center min-h-[calc(100vh-80px)] p-4">
+        <main className="relative z-10 flex items-center justify-center min-h-[calc(100vh-80px)] p-4 max-w-7xl mx-auto">
           {renderContent()}
         </main>
       </div>
