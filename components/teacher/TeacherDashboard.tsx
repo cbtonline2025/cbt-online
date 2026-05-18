@@ -18,45 +18,73 @@ const DashboardCard: React.FC<{
     isFeatured?: boolean 
 }> = ({ title, description, icon, onClick, color, isFeatured }) => {
     const colorClasses = {
-        indigo: 'from-indigo-500/10 to-sky-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400 dark:border-indigo-500/40 hover:border-indigo-400 shadow-indigo-500/10',
-        emerald: 'from-emerald-500/10 to-teal-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 dark:border-emerald-500/40 hover:border-emerald-400 shadow-emerald-500/10',
-        amber: 'from-amber-500/10 to-orange-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 dark:border-amber-500/40 hover:border-amber-400 shadow-amber-500/10',
-        violet: 'from-violet-500/10 to-purple-500/10 border-violet-500/20 text-violet-600 dark:text-violet-400 dark:border-violet-500/40 hover:border-violet-400 shadow-violet-500/10'
+        indigo: 'from-indigo-500/10 to-sky-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400 dark:border-indigo-500/40 hover:border-indigo-400',
+        emerald: 'from-emerald-500/10 to-teal-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 dark:border-emerald-500/40 hover:border-emerald-400',
+        amber: 'from-amber-500/10 to-orange-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 dark:border-amber-500/40 hover:border-amber-400',
+        violet: 'from-violet-500/10 to-purple-500/10 border-violet-500/20 text-violet-600 dark:text-violet-400 dark:border-violet-500/40 hover:border-violet-400'
+    };
+
+    const titleGradients = {
+        indigo: 'from-indigo-600 via-sky-600 to-blue-600 dark:from-indigo-300 dark:via-sky-200 dark:to-blue-200',
+        emerald: 'from-emerald-600 via-teal-600 to-green-600 dark:from-emerald-300 dark:via-teal-200 dark:to-green-200',
+        amber: 'from-amber-600 via-orange-600 to-yellow-600 dark:from-amber-400 dark:via-orange-300 dark:to-yellow-300',
+        violet: 'from-violet-600 via-purple-600 to-fuchsia-600 dark:from-violet-300 dark:via-purple-200 dark:to-fuchsia-200'
     };
 
     const gradientClasses = {
-        indigo: 'bg-gradient-to-br from-indigo-500/20 to-sky-500/20',
-        emerald: 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20',
-        amber: 'bg-gradient-to-br from-amber-500/20 to-orange-500/20',
-        violet: 'bg-gradient-to-br from-violet-500/20 to-purple-500/20'
+        indigo: 'bg-gradient-to-br from-indigo-500/30 to-sky-500/30',
+        emerald: 'bg-gradient-to-br from-emerald-500/30 to-teal-500/30',
+        amber: 'bg-gradient-to-br from-amber-500/30 to-orange-500/30',
+        violet: 'bg-gradient-to-br from-violet-500/30 to-purple-500/30'
+    };
+
+    const shadowClasses = {
+        indigo: 'hover:shadow-indigo-500/30',
+        emerald: 'hover:shadow-emerald-500/30',
+        amber: 'hover:shadow-amber-500/30',
+        violet: 'hover:shadow-violet-500/30'
+    };
+
+    const glowClasses = {
+        indigo: 'group-hover:bg-indigo-500/5',
+        emerald: 'group-hover:bg-emerald-500/5',
+        amber: 'group-hover:bg-amber-500/5',
+        violet: 'group-hover:bg-violet-500/5'
     };
 
     return (
         <motion.div
-            whileHover={{ y: -8, scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ y: -16, scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
             onClick={onClick}
-            className={`group relative glass-card p-8 rounded-[2.5rem] cursor-pointer overflow-hidden border-2 transition-all duration-500 bg-gradient-to-br ${colorClasses[color]} ${isFeatured ? 'md:col-span-2' : ''}`}
+            className={`group relative glass-card p-10 rounded-[3rem] cursor-pointer overflow-hidden border-2 transition-all duration-700 bg-gradient-to-br ${colorClasses[color]} ${shadowClasses[color]} ${glowClasses[color]} hover:shadow-3xl backdrop-blur-xl ${isFeatured ? 'md:col-span-2 shadow-xl' : 'shadow-lg'}`}
         >
-            <div className={`absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full blur-3xl opacity-30 ${gradientClasses[color]}`} />
+            <div className={`absolute top-0 right-0 w-48 h-48 -mr-12 -mt-12 rounded-full blur-3xl opacity-0 group-hover:opacity-60 ${gradientClasses[color]} transition-all duration-1000 group-hover:scale-150`} />
+            <div className={`absolute bottom-0 left-0 w-32 h-32 -ml-16 -mb-16 rounded-full blur-2xl opacity-0 group-hover:opacity-40 ${gradientClasses[color]} transition-all duration-1000 group-hover:scale-150 delay-100`} />
             
             <div className="relative z-10 flex flex-col h-full">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 group-hover:scale-110 group-hover:rotate-6 ${gradientClasses[color]} shadow-inner`}>
-                    {icon}
-                </div>
+                <motion.div 
+                    whileHover={{ rotate: [0, -10, 10, 0] }}
+                    transition={{ duration: 0.5 }}
+                    className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-8 transition-all duration-700 group-hover:scale-110 ${gradientClasses[color]} shadow-inner border border-white/30 dark:border-white/10 backdrop-blur-md`}
+                >
+                    {React.cloneElement(icon as React.ReactElement, { className: 'w-8 h-8 drop-shadow-sm' })}
+                </motion.div>
                 
                 <div className="flex-1">
-                    <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight mb-3 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    <h3 className={`text-2xl md:text-3xl font-black tracking-tight mb-4 bg-clip-text text-transparent bg-gradient-to-r ${titleGradients[color]} drop-shadow-sm`}>
                         {title}
                     </h3>
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+                    <p className="text-sm font-bold text-slate-500 dark:text-slate-400 leading-relaxed max-w-[95%] group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors duration-500">
                         {description}
                     </p>
                 </div>
                 
-                <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest transition-all duration-300 transform group-hover:translate-x-2">
-                    <span className={colorClasses[color].split(' ')[2]}>BUKA MENU</span>
-                    <ArrowRight className={`w-4 h-4 ${colorClasses[color].split(' ')[2]}`} />
+                <div className="mt-10 flex items-center gap-4 text-[11px] font-black uppercase tracking-[0.25em] transition-all duration-700 group-hover:translate-x-3">
+                    <span className="text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors duration-500">Buka Modul</span>
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${gradientClasses[color]} border border-white/20 dark:border-white/5 shadow-sm group-hover:shadow-md transition-all duration-500`}>
+                        <ArrowRight className="w-5 h-5 transition-transform duration-500 group-hover:scale-110" />
+                    </div>
                 </div>
             </div>
         </motion.div>

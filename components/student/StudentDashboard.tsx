@@ -5,7 +5,8 @@ import { mockExams } from '../../services/api';
 import { SUBJECTS_SMA, SUBJECTS_SMP } from '../../constants';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
-import { Atom, Microscope, BookOpen, Copy, LogOut } from 'lucide-react';
+import { Atom, Microscope, BookOpen, Copy, LogOut, Sparkles, LayoutDashboard, User as UserIcon, GraduationCap, Hand, Trophy, Zap, MapPin } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface StudentDashboardProps {
   user: User;
@@ -34,6 +35,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onStartExam, 
   const studentClass = user.details?.class || '';
   const gradeLevel = parseInt(studentClass.match(/\d+/)?.[0] || '0');
 
+  const getTimeGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 11) return 'Selamat Pagi';
+    if (hour < 15) return 'Selamat Siang';
+    if (hour < 18) return 'Selamat Sore';
+    return 'Selamat Malam';
+  };
+
   const availableExams = useMemo(() => {
     const studentPhase = gradeLevel >= 10 ? 'F' : 'D'; // Simplified logic
     return mockExams.filter(exam => exam.phase === studentPhase);
@@ -55,20 +64,105 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onStartExam, 
   }
 
   return (
-    <div className="w-full max-w-5xl glass-card p-10 ring-1 ring-slate-100">
-      <div className="flex flex-col md:flex-row justify-between items-start mb-12 gap-6">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-indigo-100">Portal Siswa</span>
-            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-100">Online</span>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      className="w-full max-w-5xl glass-card p-10 ring-1 ring-slate-100 dark:ring-white/5"
+    >
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6 relative">
+        <div className="flex items-center gap-6">
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 via-sky-400 to-emerald-500 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200 animate-tilt"></div>
+            <div className="relative w-20 h-20 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center border-4 border-white dark:border-slate-800 shadow-xl overflow-hidden">
+                <img 
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} 
+                  alt="avatar" 
+                  className="w-full h-full object-cover"
+                />
+            </div>
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Halo, {user.fullName}!</h1>
-          <p className="text-slate-500 font-medium mt-1">Selamat datang kembali di sistem ujian kurikulum merdeka.</p>
+
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-indigo-100 dark:border-indigo-800/50">
+                <LayoutDashboard className="w-3 h-3" />
+                Portal Pelajar
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-emerald-100 dark:border-emerald-800/50">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                SINKRON
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-amber-100 dark:border-amber-800/50">
+                <GraduationCap className="w-3 h-3" />
+                {studentClass || 'Kelas ...'}
+              </div>
+            </div>
+            
+            <h1 className="text-4xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tight flex items-center flex-wrap gap-x-4 gap-y-3 leading-tight">
+              <div className="flex items-center gap-4">
+                <div className="relative group/wave">
+                  <motion.div 
+                    animate={{ rotate: [0, 15, -15, 15, 0] }}
+                    transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+                    className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-sky-400 rounded-[1.75rem] flex items-center justify-center shadow-xl shadow-indigo-500/30 text-white group-hover/wave:scale-110 transition-transform"
+                  >
+                    <Hand className="w-10 h-10 drop-shadow-md" />
+                  </motion.div>
+                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white dark:border-slate-900 rounded-full shadow-sm"></div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.3em] mb-1">{getTimeGreeting()}</span>
+                  <span className="text-slate-900 dark:text-white">Halo,</span>
+                </div>
+              </div>
+              
+              <span className="relative group inline-block">
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 via-violet-600 to-rose-500 font-extrabold tracking-tighter bg-[length:300%_auto] animate-gradient-x drop-shadow-md pb-2">
+                  {user.fullName}
+                </span>
+                <motion.div 
+                  className="absolute bottom-1 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-600 via-violet-500 to-rose-500 rounded-full opacity-40 blur-[1px]"
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ delay: 0.8, duration: 1 }}
+                />
+              </span>
+              
+              <div className="flex gap-2">
+                <motion.div
+                  animate={{ 
+                    scale: [1, 1.2, 1],
+                  }}
+                  transition={{ repeat: Infinity, duration: 3 }}
+                  className="p-3 bg-amber-400/10 rounded-2xl border border-amber-400/20"
+                >
+                  <Sparkles className="w-8 h-8 text-amber-500 drop-shadow-[0_0_10px_rgba(245,158,11,0.6)]" />
+                </motion.div>
+                <div className="p-3 bg-sky-400/10 rounded-2xl border border-sky-400/20 hidden md:flex items-center justify-center">
+                  <Zap className="w-8 h-8 text-sky-500 animate-pulse" />
+                </div>
+              </div>
+            </h1>
+            
+            <div className="flex items-center gap-4 mt-3">
+              <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">
+                Kamu siap untuk menunjukkan performa terbaikmu hari ini?
+              </p>
+              <div className="flex items-center gap-1 text-[10px] font-black text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-2 py-0.5 rounded-md border border-rose-100 dark:border-rose-800/50 uppercase tracking-widest">
+                <Trophy className="w-3 h-3" />
+                Target: Juara
+              </div>
+            </div>
+          </div>
         </div>
-        <Button onClick={logout} variant="secondary" className="flex items-center gap-2 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm rounded-xl px-6 py-3">
-          <LogOut className="w-4 h-4" />
-          <span className="font-bold text-xs uppercase tracking-wider">Keluar Sesi</span>
-        </Button>
+        
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button onClick={logout} variant="secondary" className="group rounded-2xl border-none bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 px-8 py-4 flex items-center gap-3 transition-all">
+            <LogOut className="w-4 h-4 transition-transform group-hover:rotate-12" />
+            <span className="font-black text-xs uppercase tracking-[0.2em]">Keluar Sesi</span>
+          </Button>
+        </motion.div>
       </div>
 
       <div className="mt-8 p-1 bg-gradient-to-br from-indigo-50 to-sky-50 rounded-3xl">
@@ -137,7 +231,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onStartExam, 
             ))}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

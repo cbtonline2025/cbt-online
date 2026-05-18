@@ -2,6 +2,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
+import { FileText, Video, Music, Edit, Eye, Search, Filter, RefreshCw, Download } from 'lucide-react';
 import { Question, QuestionType, QuestionOption, QuestionMediaType } from '../../types';
 import { addQuestions, mockQuestions } from '../../services/api';
 import Button from '../ui/Button';
@@ -9,6 +10,7 @@ import Spinner from '../ui/Spinner';
 import Input from '../ui/Input';
 import QuestionDetail from './QuestionDetail';
 import EditQuestionModal from './EditQuestionModal';
+import { motion, AnimatePresence } from 'motion/react';
 
 const TabButton: React.FC<{ name: string; activeTab: string; setActiveTab: (name: string) => void; children: React.ReactNode }> = ({ name, activeTab, setActiveTab, children }) => (
     <button
@@ -814,22 +816,56 @@ const QuestionBank: React.FC = () => {
                         )}
                     </div>
                     <div className="bg-white/30 dark:bg-slate-900/50 p-6 rounded-lg text-sm text-slate-700 dark:text-slate-300">
-                        <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-4">Petunjuk Format</h3>
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
-                            <p><strong>Format Teks:</strong></p>
-                            <ul>
-                                <li><strong>Excel (.xlsx):</strong> Kolom <code>content</code> (atau <code>pertanyaan</code>/<code>soal</code>) diisi teks soal. Kolom <code>mediaType</code> (opsional) diisi "Teks".</li>
-                                <li><strong>Word (.docx):</strong> Gunakan penomoran (contoh: <code>1. Soal ini...</code>). Setiap soal WAJIB memiliki tag <code>[SUBJEK: ...]</code> dan <code>[FASE: ...]</code>.</li>
-                            </ul>
-                             <p><strong>Format Audio/Video:</strong></p>
-                            <ul>
-                                <li><strong>Excel (.xlsx):</strong> Kolom <code>mediaType</code> diisi "Audio" atau "Video". Kolom <code>mediaUrl</code> (atau <code>url</code>/<code>link</code>) diisi link media. Kolom <code>promptText</code> (atau <code>pengantar</code>) diisi teks instruksi.</li>
-                                <li><strong>Word (.docx):</strong> Tambahkan tag <code>[MEDIA_TYPE: Video]</code> dan <code>[MEDIA_URL: http://...]</code>. Gunakan <code>[PROMPT_TEXT: ...]</code> jika ingin memisahkan instruksi dari konten utama.</li>
-                            </ul>
-                            <p className="text-[10px] opacity-75 mt-2 italic">
-                                * Berbagai sinonim didukung (contoh: [SUBJECT], [MAPEL], [URL], [INSTRUKSI]) untuk kemudahan penulisan.
-                            </p>
+                        <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-indigo-500" />
+                            Panduan Format Impor
+                        </h3>
+                        
+                        <div className="space-y-4">
+                            <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800/50">
+                                <h4 className="font-black text-[10px] uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-3">Format Microsoft Excel (.xlsx)</h4>
+                                <ul className="space-y-2 text-xs leading-relaxed">
+                                    <li className="flex gap-2">
+                                        <span className="text-indigo-500 font-bold">•</span>
+                                        <span>Gunakan header kolom di baris pertama: <code className="bg-white dark:bg-slate-800 px-1 rounded border border-indigo-100 dark:border-indigo-800">content</code>, <code className="bg-white dark:bg-slate-800 px-1 rounded border border-indigo-100 dark:border-indigo-800">type</code>, <code className="bg-white dark:bg-slate-800 px-1 rounded border border-indigo-100 dark:border-indigo-800">subject</code>, <code className="bg-white dark:bg-slate-800 px-1 rounded border border-indigo-100 dark:border-indigo-800">phase</code>.</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <span className="text-indigo-500 font-bold">•</span>
+                                        <span><strong>Metadata:</strong> Contoh subjek <code className="text-emerald-600 dark:text-emerald-400 font-bold">[SUBJEK: Matematika]</code> dan fase <code className="text-emerald-600 dark:text-emerald-400 font-bold">[FASE: F]</code>.</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <span className="text-indigo-500 font-bold">•</span>
+                                        <span>Opsi jawaban di kolom <code className="bg-white dark:bg-slate-800 px-1 rounded border border-indigo-100 dark:border-indigo-800">optionA</code> s/d <code className="bg-white dark:bg-slate-800 px-1 rounded border border-indigo-100 dark:border-indigo-800">optionE</code>.</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div className="p-4 bg-sky-50/50 dark:bg-sky-900/20 rounded-xl border border-sky-100 dark:border-sky-800/50">
+                                <h4 className="font-black text-[10px] uppercase tracking-widest text-sky-600 dark:text-sky-400 mb-3">Format Microsoft Word (.docx)</h4>
+                                <div className="bg-white/50 dark:bg-slate-900/50 p-3 rounded-lg font-mono text-[10px] mb-3 border border-sky-100/50 dark:border-sky-800/30">
+                                    1. Apa yang dimaksud dengan pancasila?<br/>
+                                    <span className="text-indigo-500">[SUBJEK: PKN]</span><br/>
+                                    <span className="text-indigo-500">[FASE: F]</span><br/>
+                                    A. Dasar negara Indonesia<br/>
+                                    B. Lagu kebangsaan<br/>
+                                    KUNCI: A
+                                </div>
+                                <ul className="space-y-2 text-xs leading-relaxed">
+                                    <li className="flex gap-2">
+                                        <span className="text-sky-500 font-bold">•</span>
+                                        <span>Setiap soal wajib menggunakan nomor (1., 2., dst).</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <span className="text-sky-500 font-bold">•</span>
+                                        <span>Gunakan tag dalam kurung siku untuk metadata di baris baru.</span>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
+                        
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-4 flex items-center gap-1">
+                            <RefreshCw className="w-3 h-3" /> Berbagai sinonim tag seperti [MAPEL] atau [URL] juga didukung secara otomatis.
+                        </p>
                     </div>
                 </div>
             )}
@@ -1101,60 +1137,103 @@ const QuestionBank: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="max-h-96 overflow-y-auto bg-white/30 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-inner">
+                <div className="max-h-[600px] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/30 p-6 rounded-[2rem] border border-slate-200/60 dark:border-slate-800/50 shadow-inner custom-scrollbar">
                     {filteredQuestions.length > 0 ? (
-                        <ul className="space-y-3">
-                            {[...filteredQuestions].reverse().map((q, revIndex) => {
-                                const originalIndex = filteredQuestions.length - 1 - revIndex;
-                                const displayIndex = filteredQuestions.length - originalIndex;
-                                
-                                return (
-                                    <li key={q.id} className="group flex items-stretch bg-white/60 dark:bg-slate-800/60 rounded-xl border border-white dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 hover:shadow-md transition-all duration-200 overflow-hidden">
-                                        <button 
-                                            onClick={() => setSelectedQuestionId(q.id)}
-                                            className="flex-grow text-left p-4 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
-                                            title="Klik untuk melihat detail soal"
+                        <div className="space-y-4">
+                            <AnimatePresence mode="popLayout">
+                                {[...filteredQuestions].reverse().map((q, revIndex) => {
+                                    const originalIndex = filteredQuestions.length - 1 - revIndex;
+                                    const displayIndex = filteredQuestions.length - originalIndex;
+                                    
+                                    return (
+                                        <motion.div
+                                            key={q.id}
+                                            layout
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            transition={{ duration: 0.3, delay: revIndex * 0.05 }}
+                                            className="group flex items-stretch bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-[1.5rem] border border-slate-200/60 dark:border-slate-700/50 hover:border-indigo-500/50 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05),0_10px_25px_-5px_rgba(0,0,0,0.03)] dark:shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)] hover:shadow-2xl hover:shadow-indigo-500/20 dark:hover:shadow-indigo-500/20 hover:-translate-y-1.5 transition-all duration-500 overflow-hidden"
                                         >
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-xs font-bold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded">
-                                                    #{displayIndex}
-                                                </span>
-                                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/50 px-1.5 py-0.5 rounded">
-                                                    {q.subject} • Fase {q.phase}
-                                                </span>
-                                                {q.mediaType !== QuestionMediaType.TEXT && (
-                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                                        {q.mediaType === QuestionMediaType.VIDEO ? (
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                                                        ) : (
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15L4 14.414V9.586L5.586 9H10l5 5v5l-5-4H5.586z" /></svg>
-                                                        )}
-                                                        {q.mediaType}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="text-slate-800 dark:text-slate-200 line-clamp-2 text-sm">
-                                                {q.mediaType === QuestionMediaType.TEXT ? q.content : q.promptText}
-                                            </p>
-                                        </button>
-                                        <div className="flex flex-col border-l border-slate-200 dark:border-slate-700/50">
                                             <button 
-                                                onClick={(e) => { e.stopPropagation(); setEditingQuestionId(q.id); }}
-                                                className="p-4 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
-                                                title="Edit Soal"
+                                                onClick={() => setSelectedQuestionId(q.id)}
+                                                className="flex-grow text-left p-5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                                                title="Klik untuk melihat detail soal"
                                             >
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                <div className="flex flex-wrap items-center gap-3 mb-3">
+                                                    <span className="text-[11px] font-black bg-indigo-600 dark:bg-indigo-500 text-white px-2 py-0.5 rounded-full shadow-lg shadow-indigo-500/20">
+                                                        #{displayIndex}
+                                                    </span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/80 px-2 py-1 rounded-lg">
+                                                        {q.subject}
+                                                    </span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-2 py-1 rounded-lg">
+                                                        Fase {q.phase}
+                                                    </span>
+                                                    
+                                                    {q.mediaType !== QuestionMediaType.TEXT && (
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-2 py-1 rounded-lg flex items-center gap-1.5 shadow-sm shadow-amber-500/10">
+                                                            {q.mediaType === QuestionMediaType.VIDEO ? (
+                                                                <Video className="w-3 h-3" />
+                                                            ) : (
+                                                                <Music className="w-3 h-3" />
+                                                            )}
+                                                            {q.mediaType}
+                                                        </span>
+                                                    )}
+                                                    
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg ${
+                                                        q.type === QuestionType.MULTIPLE_CHOICE 
+                                                        ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/40' 
+                                                        : 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/40'
+                                                    }`}>
+                                                        {q.type === QuestionType.MULTIPLE_CHOICE ? 'Pilihan Ganda' : 'Esai'}
+                                                    </span>
+                                                </div>
+                                                
+                                                <div className="flex items-start gap-4">
+                                                    <div className="flex-grow">
+                                                        <p className="text-slate-900 dark:text-white font-bold line-clamp-2 leading-relaxed text-sm md:text-base transition-colors duration-300">
+                                                            {q.mediaType === QuestionMediaType.TEXT ? q.content : q.promptText}
+                                                        </p>
+                                                    </div>
+                                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-400">
+                                                        <Eye className="w-5 h-5" />
+                                                    </div>
+                                                </div>
                                             </button>
-                                        </div>
-                                    </li>
-                                );
-                            })}
-                        </ul>
+                                            
+                                            <div className="flex flex-col border-l border-slate-100 dark:border-slate-700/50">
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setEditingQuestionId(q.id); }}
+                                                    className="flex-grow p-5 flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all border-b border-slate-100 dark:border-slate-700/50"
+                                                    title="Edit Soal"
+                                                >
+                                                    <Edit className="h-5 w-5" />
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setSelectedQuestionId(q.id); }}
+                                                    className="flex-grow p-5 flex items-center justify-center text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all"
+                                                    title="Lihat Detail"
+                                                >
+                                                    <Eye className="h-5 w-5" />
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
+                            </AnimatePresence>
+                        </div>
                     ) : (
-                        <div className="text-center py-12">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                            <p className="mt-4 text-slate-600 dark:text-slate-400 font-semibold">Tidak ada soal yang cocok</p>
-                            <p className="text-sm text-slate-500 dark:text-slate-500">Coba ubah kata kunci atau filter Anda.</p>
+                        <div className="text-center py-20 bg-white/40 dark:bg-slate-800/40 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700">
+                            <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <Search className="h-10 w-10 text-slate-400" />
+                            </div>
+                            <h4 className="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Tidak ada soal yang cocok</h4>
+                            <p className="text-slate-500 dark:text-slate-500 max-w-xs mx-auto">Coba ubah kata kunci atau filter Anda untuk menemukan apa yang Anda cari.</p>
+                            <Button onClick={handleResetFilters} variant="secondary" className="mt-8">
+                                Reset Pencarian
+                            </Button>
                         </div>
                     )}
                 </div>

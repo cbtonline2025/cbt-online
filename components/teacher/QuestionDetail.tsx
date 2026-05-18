@@ -4,6 +4,8 @@ import { Question, QuestionType, QuestionMediaType } from '../../types';
 import { fetchQuestionById } from '../../services/api';
 import Spinner from '../ui/Spinner';
 import Button from '../ui/Button';
+import { CheckCircle2, Circle, ArrowLeft, Info } from 'lucide-react';
+import { motion } from 'motion/react';
 
 interface QuestionDetailProps {
   questionId: string;
@@ -11,9 +13,12 @@ interface QuestionDetailProps {
 }
 
 const DetailCard: React.FC<{ label: string; value: string; className?: string }> = ({ label, value, className }) => (
-    <div className={`bg-white/40 dark:bg-slate-800/50 p-3 rounded-lg ${className}`}>
-        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{label}</p>
-        <p className="font-semibold text-slate-800 dark:text-white">{value}</p>
+    <div className={`bg-white/60 dark:bg-slate-800/60 backdrop-blur-md p-4 rounded-2xl border border-white/40 dark:border-slate-700/50 shadow-sm ${className}`}>
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest mb-1 flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+            {label}
+        </p>
+        <p className="font-extrabold text-slate-900 dark:text-white tracking-tight">{value}</p>
     </div>
 );
 
@@ -140,59 +145,99 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({ questionId, onBack }) =
   return (
     <div>
         <div className="mb-6">
-             <button onClick={onBack} className="font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors text-sm">
-                {'< Kembali ke Daftar Soal'}
+             <button 
+                onClick={onBack} 
+                className="group flex items-center gap-2 font-black text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-all text-xs uppercase tracking-widest"
+            >
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center group-hover:-translate-x-1 transition-transform">
+                    <ArrowLeft className="w-4 h-4" />
+                </div>
+                Kembali ke Daftar Soal
             </button>
         </div>
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-4">Detail Soal</h2>
+        
+        <div className="flex items-center gap-4 mb-6">
+            <h2 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Detail Soal</h2>
+            <div className="h-px flex-grow bg-gradient-to-r from-slate-200 to-transparent dark:from-slate-700/50" />
+        </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <DetailCard label="Mata Pelajaran" value={question.subject} />
             <DetailCard label="Fase" value={question.phase} />
             <DetailCard label="Tipe Soal" value={question.type} />
             <DetailCard label="Tipe Konten" value={mediaType} />
         </div>
 
-        <div className="bg-white/30 dark:bg-slate-900/50 p-6 rounded-lg">
-            <h3 className="font-bold text-lg mb-3 text-indigo-700 dark:text-indigo-300">
-              {mediaType === QuestionMediaType.TEXT ? 'Konten Pertanyaan' : 'Teks Pengantar'}
-            </h3>
-            <div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 mb-6">
+        <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2rem] border border-white/40 dark:border-slate-800/50 shadow-xl">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
+                    <Info className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <h3 className="font-black text-xl text-slate-800 dark:text-slate-100 tracking-tight">
+                    {mediaType === QuestionMediaType.TEXT ? 'Konten Pertanyaan' : 'Teks Pengantar'}
+                </h3>
+            </div>
+            
+            <div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 mb-8 p-6 bg-white/30 dark:bg-slate-800/30 rounded-2xl border border-white/20 dark:border-slate-700/30 shadow-inner leading-relaxed text-lg">
                 {mediaType === QuestionMediaType.TEXT ? question.content : question.promptText}
             </div>
 
             {(mediaType === QuestionMediaType.AUDIO || mediaType === QuestionMediaType.VIDEO) && (
-                <div className="mb-6">
-                    <h3 className="font-bold text-lg mb-3 text-indigo-700 dark:text-indigo-300">Pratinjau Media</h3>
-                    <MediaRenderer question={question} />
+                <div className="mb-8">
+                    <h3 className="font-black text-lg mb-4 text-indigo-700 dark:text-indigo-300">Pratinjau Media</h3>
+                    <div className="p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-white/10">
+                        <MediaRenderer question={question} />
+                    </div>
                 </div>
             )}
 
-            <hr className="border-white/20 dark:border-slate-700/50 my-6" />
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-700/50 to-transparent my-8" />
 
             {question.type === QuestionType.MULTIPLE_CHOICE && question.options && (
                 <div>
-                    <h3 className="font-bold text-lg mb-4 text-indigo-700 dark:text-indigo-300">Opsi Jawaban</h3>
-                    <div className="space-y-3">
+                    <h3 className="font-black text-xl mb-6 text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+                        <div className="w-2 h-6 bg-indigo-500 rounded-full" />
+                        Opsi Jawaban
+                    </h3>
+                    <div className="grid gap-4">
                         {question.options.map((option, index) => {
                             const isCorrect = option.id === question.correctAnswer;
                             return (
-                                <div
+                                <motion.div
                                     key={option.id}
-                                    className={`flex items-start p-4 border rounded-lg transition-all duration-200 ${
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: index * 0.1 }}
+                                    className={`group flex items-start p-5 backdrop-blur-md rounded-[1.5rem] border-2 transition-all duration-500 ${
                                         isCorrect
-                                        ? 'bg-emerald-100 border-emerald-500 ring-2 ring-emerald-300 dark:bg-emerald-900/50 dark:border-emerald-500'
-                                        : 'bg-white/50 border-slate-300 dark:bg-slate-800/50 dark:border-slate-600'
+                                        ? 'bg-emerald-50/60 border-emerald-500 dark:bg-emerald-500/10 shadow-lg shadow-emerald-500/10'
+                                        : 'bg-white/40 border-slate-200/60 dark:bg-slate-800/40 dark:border-slate-700/50 hover:bg-white/60 dark:hover:bg-slate-800/60 hover:shadow-md'
                                     }`}
                                 >
-                                    {isCorrect ? (
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-emerald-600 dark:text-emerald-400 mr-3 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                                    ) : (
-                                        <div className="flex-shrink-0 w-6 h-6 border-2 border-slate-400 dark:border-slate-500 rounded-full flex items-center justify-center mr-3" />
-                                    )}
-                                    <span className="font-semibold mr-2">{optionLetters[index]}.</span>
-                                    <span className="text-slate-800 dark:text-slate-200">{option.text}</span>
-                                </div>
+                                    <div className="mr-4 flex-shrink-0">
+                                        {isCorrect ? (
+                                            <div className="w-10 h-10 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                                                <CheckCircle2 className="w-6 h-6 text-white" />
+                                            </div>
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center border-2 border-slate-200 dark:border-slate-600 group-hover:scale-105 transition-transform">
+                                                <span className="font-black text-slate-400 dark:text-slate-500">
+                                                    {optionLetters[index]}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="pt-1">
+                                        <p className={`font-bold transition-colors ${isCorrect ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            {option.text}
+                                        </p>
+                                        {isCorrect && (
+                                            <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mt-1 inline-block">
+                                                Jawaban Terverifikasi
+                                            </span>
+                                        )}
+                                    </div>
+                                </motion.div>
                             );
                         })}
                     </div>
@@ -200,9 +245,16 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({ questionId, onBack }) =
             )}
 
             {question.type === QuestionType.ESSAY && (
-                <div>
-                    <h3 className="font-bold text-lg mb-3 text-indigo-700 dark:text-indigo-300">Kunci Jawaban Esai</h3>
-                     <p className="text-sm text-slate-700 dark:text-slate-300 bg-white/50 dark:bg-slate-800/50 p-4 rounded-md">{question.correctAnswer}</p>
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <h3 className="font-black text-xl mb-4 text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+                        <div className="w-2 h-6 bg-indigo-500 rounded-full" />
+                        Kunci Jawaban Esai
+                    </h3>
+                    <div className="bg-gradient-to-br from-indigo-50 to-sky-50 dark:from-indigo-900/10 dark:to-sky-900/10 p-6 rounded-3xl border-2 border-indigo-100 dark:border-indigo-500/20">
+                        <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-bold italic">
+                            "{question.correctAnswer}"
+                        </p>
+                    </div>
                 </div>
             )}
         </div>
