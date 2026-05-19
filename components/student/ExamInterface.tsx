@@ -139,7 +139,14 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
 
   return (
     <div className="w-full h-[95vh] max-w-7xl flex flex-col md:flex-row gap-8 bg-transparent p-2 relative">
-        {/* Anti-Cheat Alert Overlay */}
+        {/* Persistent Anti-Cheat Warning Banner */}
+        {warnings > 0 && (
+            <div className="absolute top-0 left-0 right-0 z-[60] bg-rose-600 text-white py-1.5 px-4 text-center text-[10px] font-black uppercase tracking-[0.2em] shadow-lg animate-pulse border-b border-white/20">
+                Sistem Integritas: Pelanggaran Terdeteksi ({warnings}/3 Peringatan). Hindari keluar dari tab atau jendela ujian!
+            </div>
+        )}
+
+        {/* Anti-Cheat Alert Overlay (Transient) */}
         {violationMessage && (
             <div className="fixed top-10 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
                 <div className="bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border-2 border-white/20 backdrop-blur-xl">
@@ -159,6 +166,7 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
                     <QuestionPanel 
                         question={currentQuestion}
                         questionNumber={currentQuestionIndex + 1}
+                        totalQuestions={questions.length}
                         currentAnswer={currentAnswer.answer}
                         isDoubtful={currentAnswer.isDoubtful}
                         onAnswerChange={handleAnswerChange}

@@ -1,57 +1,46 @@
 
 import React from 'react';
 import { Question, QuestionType, QuestionMediaType } from '../../types';
+import { Volume2, Video, Headphones, PlayCircle, Info } from 'lucide-react';
 
 interface QuestionPanelProps {
   question: Question;
   questionNumber: number;
+  totalQuestions: number;
   currentAnswer: string;
   isDoubtful: boolean;
   onAnswerChange: (questionId: string, answer: string) => void;
   onToggleDoubtful: (questionId: string) => void;
 }
 
-const getEmbedUrl = (url: string, type?: QuestionMediaType): string | null => {
+const getEmbedUrl = (url: string): string | null => {
     if (!url) return null;
-    try {
-        const trimmedUrl = url.trim();
-        
-        // Handle YouTube
-        if (trimmedUrl.includes('youtube.com') || trimmedUrl.includes('youtu.be')) {
-            let videoId = null;
-            if (trimmedUrl.includes('youtube.com/watch?v=')) {
-                const urlObj = new URL(trimmedUrl);
-                videoId = urlObj.searchParams.get('v');
-            } else if (trimmedUrl.includes('youtube.com/embed/')) {
-                videoId = trimmedUrl.split('/embed/')[1].split(/[?#]/)[0];
-            } else if (trimmedUrl.includes('youtu.be/')) {
-                const urlObj = new URL(trimmedUrl);
-                videoId = urlObj.pathname.substring(1);
-            }
-            if (videoId) return `https://www.youtube.com/embed/${videoId}`;
-        }
+    
+    const trimmedUrl = url.trim();
 
-        // Handle Google Drive
-        if (trimmedUrl.includes('drive.google.com/file/d/')) {
-            const fileId = trimmedUrl.split('/d/')[1].split('/')[0];
-            return `https://drive.google.com/file/d/${fileId}/preview`;
-        }
-        
-        if (trimmedUrl.includes('drive.google.com/open?id=')) {
-            const urlObj = new URL(trimmedUrl);
-            const fileId = urlObj.searchParams.get('id');
-            if (fileId) return `https://drive.google.com/file/d/${fileId}/preview`;
-        }
-
-    } catch (e) {
-        console.error("Invalid URL for embedding:", url, e);
+    // YouTube: handles watch, embed, shorts, youtu.be, and /v/
+    const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([^"&?\/\s]{11})/i;
+    const youtubeMatch = trimmedUrl.match(youtubeRegex);
+    
+    if (youtubeMatch && youtubeMatch[1]) {
+        return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
     }
-    return url; // Fallback for other URLs
+
+    // Google Drive: handles /file/d/, open?id=, and /d/
+    const driveRegex = /drive\.google\.com\/(?:file\/d\/|open\?id=|d\/)([a-zA-Z0-9_-]+)/i;
+    const driveMatch = trimmedUrl.match(driveRegex);
+    
+    if (driveMatch && driveMatch[1]) {
+        return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+    }
+
+    // Return the original URL as fallback if it looks like a direct link
+    return trimmedUrl;
 };
 
 const MediaRenderer: React.FC<{ question: Question }> = ({ question }) => {
     const mediaType = question.mediaType || QuestionMediaType.TEXT;
-    const embedUrl = getEmbedUrl(question.content, mediaType);
+    const embedUrl = getEmbedUrl(question.content);
     
     if (!embedUrl || embedUrl.trim() === '') {
         return <p className="text-amber-500 italic my-2 text-sm">Media tidak tersedia.</p>;
@@ -116,6 +105,7 @@ const MediaRenderer: React.FC<{ question: Question }> = ({ question }) => {
 const QuestionPanel: React.FC<QuestionPanelProps> = ({
   question,
   questionNumber,
+  totalQuestions,
   currentAnswer,
   isDoubtful,
   onAnswerChange,
@@ -130,16 +120,16 @@ const QuestionPanel: React.FC<QuestionPanelProps> = ({
             <div className="flex items-center gap-3">
                 <span className="w-10 h-10 flex items-center justify-center bg-indigo-600 text-white font-black rounded-xl shadow-lg shadow-indigo-100 italic">Q</span>
                 <div>
-                   <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest leading-none">Pertanyaan Ke</h2>
-                   <span className="text-2xl font-black text-slate-900 tracking-tighter">{questionNumber} <span className="text-slate-300 font-medium">/ 10</span></span>
+                   <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">Pertanyaan Ke</h2>
+                   <span className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">{questionNumber} <span className="text-slate-300 dark:text-slate-700 font-medium">/ {totalQuestions}</span></span>
                 </div>
             </div>
             {mediaType !== QuestionMediaType.TEXT && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] border border-amber-100 shadow-sm">
+                <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] border border-indigo-100 dark:border-indigo-800/50 shadow-sm transition-all duration-500">
                     {mediaType === QuestionMediaType.AUDIO ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15L4 14.414V9.586L5.586 9H10l5 5v5l-5-4H5.586z" /></svg>
+                        <Volume2 className="h-4 w-4 animate-pulse" />
                     ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                        <Video className="h-4 w-4 animate-pulse" />
                     )}
                     <span>{mediaType === QuestionMediaType.AUDIO ? 'LISTEN' : 'WATCH'}</span>
                 </div>
@@ -154,8 +144,12 @@ const QuestionPanel: React.FC<QuestionPanelProps> = ({
             ) : (
                 <div className="space-y-8">
                     {question.promptText && (
-                        <div className="text-lg leading-relaxed text-slate-600 max-w-none bg-slate-50/50 p-8 rounded-3xl border border-dashed border-slate-200 italic font-medium">
-                            <span className="not-italic font-black block mb-4 text-indigo-500 text-[10px] uppercase tracking-widest pl-1">Instruksi Spesifik</span>
+                        <div className="text-lg leading-relaxed text-slate-600 dark:text-slate-400 max-w-none bg-slate-50/50 dark:bg-slate-900/30 p-8 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 italic font-medium relative group/prompt overflow-hidden">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl group-hover/prompt:bg-indigo-500/10 transition-colors"></div>
+                            <span className="not-italic font-black flex items-center gap-2 mb-4 text-indigo-500 dark:text-indigo-400 text-[10px] uppercase tracking-widest pl-1">
+                                <Info className="w-3 h-3" />
+                                Instruksi Spesifik
+                            </span>
                             {question.promptText}
                         </div>
                     )}

@@ -5,7 +5,7 @@ import { Role } from '../../types';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { motion } from 'motion/react';
-import { User, GraduationCap, ShieldCheck, LogIn, UserCircle, KeyRound } from 'lucide-react';
+import { User, GraduationCap, ShieldCheck, LogIn, UserCircle, KeyRound, Fingerprint } from 'lucide-react';
 
 interface LoginProps {
     onRegisterClick: () => void;
@@ -46,21 +46,18 @@ const Login: React.FC<LoginProps> = ({ onRegisterClick }) => {
         <div className="mx-auto w-20 h-20 bg-gradient-to-br from-indigo-50 to-sky-50 dark:from-indigo-900/10 dark:to-sky-900/10 rounded-[1.75rem] flex items-center justify-center mb-6 shadow-inner border border-white/50 dark:border-white/5 group transition-all duration-500 hover:rotate-6">
           <LogIn className="w-10 h-10 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
         </div>
-        <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter mb-5 leading-[1.1] flex items-center justify-center flex-wrap gap-4 group">
-          <div className="relative">
-            <motion.div 
-              animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
-              transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-              className="relative z-10 w-12 h-12 md:w-16 md:h-16 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-2xl flex items-center justify-center shadow-2xl shadow-indigo-500/40 text-white"
-            >
-              <KeyRound className="w-7 h-7 md:w-9 md:h-9" />
-            </motion.div>
-            <div className="absolute -inset-2 bg-indigo-500/20 blur-xl rounded-full animate-pulse" />
-          </div>
-          <div className="flex flex-col items-center md:items-start text-center md:text-left">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-500 bg-[length:200%_auto] animate-gradient-x font-black tracking-tight drop-shadow-md py-1">
+        <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter mb-5 leading-[1.1] flex items-center justify-center gap-2 group">
+          <div className="flex items-center gap-3 md:gap-4">
+            <span className="bg-clip-text text-transparent bg-gradient-to-br from-indigo-600 via-fuchsia-600 to-orange-500 bg-[length:200%_auto] animate-gradient-x font-black tracking-tighter drop-shadow-sm py-1">
               Masuk Portal
             </span>
+            <motion.div
+              initial={{ rotate: -20, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
+            >
+              <Fingerprint className="w-8 h-8 md:w-12 md:h-12 text-fuchsia-500 animate-pulse" />
+            </motion.div>
           </div>
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 font-medium max-w-[240px] mx-auto">

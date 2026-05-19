@@ -109,15 +109,14 @@ const EditQuestionModal: React.FC<EditQuestionModalProps> = ({ questionId, onClo
 
   const handleRemoveOption = (optionIdToRemove: string) => {
     if (question && question.options && question.options.length > 2) {
-      if (!window.confirm("Apakah Anda yakin ingin menghapus opsi ini?")) {
-        return;
-      }
+      if (!window.confirm("Apakah Anda yakin ingin menghapus opsi jawaban ini?")) return;
+
       const newOptions = question.options.filter(opt => opt.id !== optionIdToRemove);
 
       let newCorrectAnswer = question.correctAnswer;
-      // If the deleted option was the correct answer, reset to the first remaining option
+      // If the deleted option was the correct answer, reset it
       if (question.correctAnswer === optionIdToRemove) {
-        newCorrectAnswer = newOptions[0]?.id || '';
+        newCorrectAnswer = '';
       }
 
       setQuestion({
@@ -163,6 +162,11 @@ const EditQuestionModal: React.FC<EditQuestionModalProps> = ({ questionId, onClo
         const hasEmptyOption = question.options?.some(opt => opt.text.trim() === '');
         if (hasEmptyOption) {
             setError("Teks opsi jawaban tidak boleh kosong.");
+            setIsSaving(false);
+            return;
+        }
+        if (!question.correctAnswer) {
+            setError("Harap pilih salah satu opsi sebagai kunci jawaban yang benar.");
             setIsSaving(false);
             return;
         }
@@ -435,10 +439,10 @@ const EditQuestionModal: React.FC<EditQuestionModalProps> = ({ questionId, onClo
                                         <button
                                             type="button"
                                             onClick={() => handleRemoveOption(opt.id)}
-                                            className="p-2.5 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 transition-all active:scale-90"
+                                            className="p-2 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 transition-all active:scale-90"
                                             title="Hapus Opsi"
                                         >
-                                            <Trash2 className="h-4.5 w-4.5" />
+                                            <Trash2 className="h-4 w-4" />
                                         </button>
                                     )}
                                 </motion.div>

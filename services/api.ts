@@ -95,6 +95,68 @@ const initialQuestions: Question[] = [
       phase: 'F', 
       correctAnswer: 'Nada yang dominan adalah melankolis dan penuh perenungan (kontemplatif).'
     },
+    // Fase F (SMA) - Bahasa Inggris (Audio Drive) - Percakapan di Bandara
+    { 
+      id: 'q12', 
+      type: QuestionType.MULTIPLE_CHOICE, 
+      mediaType: QuestionMediaType.AUDIO,
+      promptText: 'Listen to the announcement at the airport. What is the main reason for the flight delay?',
+      content: 'https://drive.google.com/file/d/1A9_tB4hV_xX7g8hI5yL9xW3zV6n7o8kW/preview', // Mock Drive Audio
+      subject: 'Bahasa Inggris', 
+      phase: 'F', 
+      options: [
+          {id: 'q12o1', text: 'Technical problems with the aircraft'}, 
+          {id: 'q12o2', text: 'Severe weather conditions'}, 
+          {id: 'q12o3', text: 'Late arrival of the incoming flight'}, 
+          {id: 'q12o4', text: 'A strike by airport personnel'}
+      ], 
+      correctAnswer: 'q12o2' 
+    },
+    // Fase F (SMA) - Geografi (Video YouTube) - Proses Erupsi Gunung Api
+    { 
+      id: 'q13', 
+      type: QuestionType.ESSAY, 
+      mediaType: QuestionMediaType.VIDEO,
+      promptText: 'Simak video simulasi erupsi gunung api ini. Deskripsikan urutan kejadian mulai dari aktivitas magma hingga terjadinya aliran piroklastik!',
+      content: 'https://www.youtube.com/watch?v=VB62O76fCQQ', 
+      subject: 'Geografi', 
+      phase: 'F', 
+      correctAnswer: 'Aktivitas dimulai dengan peningkatan tekanan magma di dapur magma, diikuti munculnya gempa vulkanik. Selanjutnya terjadi letusan eksplosif yang melontarkan material vulkanik, dan diakhiri dengan runtuhnya kolom letusan yang membentuk aliran piroklastik (awan panas).'
+    },
+    // Fase D (SMP) - Seni Budaya (Video YouTube) - Tari Tradisional
+    { 
+      id: 'q14', 
+      type: QuestionType.MULTIPLE_CHOICE, 
+      mediaType: QuestionMediaType.VIDEO,
+      promptText: 'Perhatikan gerakan tangan dan formasi dalam cuplikan pertunjukan tari ini. Berasal dari daerah manakah tari tersebut?',
+      content: 'https://www.youtube.com/watch?v=F2o_S7_kP6A', 
+      subject: 'Seni Budaya', 
+      phase: 'D', 
+      options: [
+          {id: 'q14o1', text: 'Aceh'}, 
+          {id: 'q14o2', text: 'Bali'}, 
+          {id: 'q14o3', text: 'Sumatera Barat'}, 
+          {id: 'q14o4', text: 'Papua'}
+      ], 
+      correctAnswer: 'q14o2' 
+    },
+    // Fase D (SMP) - IPA (Audio Drive) - Identifikasi Suara Burung
+    { 
+      id: 'q15', 
+      type: QuestionType.MULTIPLE_CHOICE, 
+      mediaType: QuestionMediaType.AUDIO,
+      promptText: 'Dengarkan rekaman suara burung berikut. Ini adalah kicauan khas dari burung habitat hutan tropis Indonesia, yaitu...',
+      content: 'https://drive.google.com/file/d/1C7_tD4hV_yY7g8hI5yL9xW3zV6n7o8kX/preview', // Mock Drive Audio
+      subject: 'IPA', 
+      phase: 'D', 
+      options: [
+          {id: 'q15o1', text: 'Burung Merpati'}, 
+          {id: 'q15o2', text: 'Burung Cendrawasih'}, 
+          {id: 'q15o3', text: 'Burung Jalak Bali'}, 
+          {id: 'q15o4', text: 'Burung Gagak'}
+      ], 
+      correctAnswer: 'q15o3' 
+    },
 ];
 
 // --- Local Storage Keys ---
