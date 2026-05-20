@@ -220,17 +220,18 @@ const QuestionBank: React.FC = () => {
                 const mediaUrl = (newQuestion.mediaUrl || '').trim();
                 const mediaPrompt = (newQuestion.promptText || '').trim();
 
+                if (!mediaPrompt) {
+                    throw new Error('Teks pengantar (promptText) wajib diisi ketika tipe konten adalah Audio atau Video.');
+                }
+
                 if (manualMediaFile) {
                     // File based media
                     content = ''; // will be filled by base64 below
-                    promptText = mediaPrompt || `Media: ${manualMediaFile.name}`;
+                    promptText = mediaPrompt;
                 } else {
                     // URL based media
                     if (!mediaUrl) {
                         throw new Error(`URL Media ${newQuestion.mediaType} wajib diisi.`);
-                    }
-                    if (!mediaPrompt) {
-                        throw new Error('Teks pengantar media wajib diisi.');
                     }
                     content = mediaUrl;
                     promptText = mediaPrompt;
@@ -433,6 +434,15 @@ const QuestionBank: React.FC = () => {
                         throw new Error("File Excel terbaca, namun tidak ditemukan baris data soal di bawah baris judul (header).");
                     }
 
+                    const isValidHttpUrl = (str: string) => {
+                        try {
+                            const u = new URL(str.trim());
+                            return u.protocol === 'http:' || u.protocol === 'https:';
+                        } catch (_) {
+                            return false;
+                        }
+                    };
+
                     const parsedQuestions: Question[] = json.map((row, index) => {
                         const rowNum = index + 2; // +1 for 0-indexing, +1 for header row
                         
@@ -471,6 +481,12 @@ const QuestionBank: React.FC = () => {
                         const phase = String(row['phase']).trim().toUpperCase();
                         if (!['D', 'E', 'F'].includes(phase)) {
                             throw new Error(`[BARIS ${rowNum}] Fase '${phase}' tidak valid. Pilihan yang tersedia: D, E, atau F.`);
+                        }
+
+                        // 3b. Validasi Mata Pelajaran (subject)
+                        const subjectVal = String(row['subject']).trim();
+                        if (subjectVal.length < 2) {
+                             throw new Error(`[BARIS ${rowNum}] Mata pelajaran (kolom 'subject') harus berupa teks minimal 2 karakter.`);
                         }
 
                         // 4. Normalisasi & Validasi Tipe Media
@@ -512,6 +528,11 @@ const QuestionBank: React.FC = () => {
                                 throw new Error(`[BARIS ${rowNum}] URL Media wajib diisi (gunakan kolom 'mediaUrl', 'url', 'link' atau 'content' dengan link yang valid).`);
                             }
                             finalContent = String(actualUrl).trim();
+
+                            // Validasi format URL media
+                            if (!isValidHttpUrl(finalContent)) {
+                                throw new Error(`[BARIS ${rowNum}] URL Media ('${finalContent}') tidak valid. Harap berikan URL lengkap dengan protokol HTTP atau HTTPS (seperti Google Drive atau YouTube).`);
+                            }
                             
                             // Jika promptText masih kosong atau sama dengan URL, coba cari dari kolom lain
                             if (!finalPromptText || finalPromptText === finalContent) {
@@ -532,7 +553,7 @@ const QuestionBank: React.FC = () => {
                             type,
                             mediaType,
                             promptText: finalPromptText,
-                            subject: String(row['subject']).trim(),
+                            subject: subjectVal,
                             phase: phase as 'D' | 'E' | 'F',
                             correctAnswer: String(row['correctAnswer']).trim(),
                             options: [],
@@ -554,11 +575,18 @@ const QuestionBank: React.FC = () => {
                             if (question.options.length < 2) {
                                 throw new Error(`[BARIS ${rowNum}] Soal Pilihan Ganda harus memiliki minimal 2 opsi (di kolom optionA, optionB, dst) yang tidak kosong.`);
                             }
+
+                            // Cek teks opsi duplikat
+                            const optionTexts = question.options.map(opt => opt.text);
+                            const duplicatedOption = optionTexts.find((text, idx) => optionTexts.indexOf(text) !== idx);
+                            if (duplicatedOption) {
+                                throw new Error(`[BARIS ${rowNum}] Teks opsi jawaban tidak boleh duplikat (Ditemukan duplikasi teks: "${duplicatedOption}").`);
+                            }
                             
                             // 6. Validasi Kunci Jawaban
                             const correctLetter = String(row['correctAnswer']).trim().toUpperCase();
                             if (!possibleOptions.includes(correctLetter)) {
-                                throw new Error(`[BARIS ${rowNum}] Kunci Jawaban '${correctLetter}' tidak valid. Gunakan huruf A, B, C, D, atau E.`);
+                                throw new Error(`[BARIS ${rowNum}] Kunci Jawaban '${correctLetter}' tidak valid. Gunakan huruf tunggal A, B, C, D, atau E.`);
                             }
 
                             // Pastikan kunci merujuk pada kolom yang berisi teks
@@ -610,6 +638,15 @@ const QuestionBank: React.FC = () => {
                         throw new Error("Tidak ada soal yang ditemukan. Pastikan soal menggunakan penomoran standar (1. Soal...)");
                     }
 
+                    const isValidHttpUrl = (str: string) => {
+                        try {
+                            const u = new URL(str.trim());
+                            return u.protocol === 'http:' || u.protocol === 'https:';
+                        } catch (_) {
+                            return false;
+                        }
+                    };
+
                     const parsedQuestions: Question[] = questionsText.map((qText, index) => {
                         const questionNum = index + 1;
                         
@@ -637,6 +674,10 @@ const QuestionBank: React.FC = () => {
                             throw new Error(`[SOAL ${questionNum}] Metadata [SUBJEK] tidak ditemukan. Pastikan ada tag seperti [SUBJEK: Nama Mapel] di dalam soal.`);
                         }
 
+                        if (subject.length < 2) {
+                            throw new Error(`[SOAL ${questionNum}] Metadata [SUBJEK] harus berupa teks minimal 2 karakter.`);
+                        }
+
                         if (!phaseRaw) {
                             throw new Error(`[SOAL ${questionNum}] Metadata [FASE] tidak ditemukan. Tambahkan tag [FASE: D/E/F] untuk menentukan jenjang soal.`);
                         }
@@ -653,6 +694,10 @@ const QuestionBank: React.FC = () => {
                                 mediaType = QuestionMediaType.AUDIO;
                             } else if (mediaTypeRaw.includes('video') || mediaTypeRaw.includes('youtube')) {
                                 mediaType = QuestionMediaType.VIDEO;
+                            } else if (mediaTypeRaw.includes('teks') || mediaTypeRaw.includes('text')) {
+                                mediaType = QuestionMediaType.TEXT;
+                            } else {
+                                throw new Error(`[SOAL ${questionNum}] Tipe Media '${mediaTypeRaw}' tidak dikenali. Gunakan: Teks, Audio, atau Video.`);
                             }
                         } else if (mediaUrl && (mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be'))) {
                             // Auto-detect YouTube as video
@@ -660,8 +705,13 @@ const QuestionBank: React.FC = () => {
                         }
 
                         // 4. Validasi Media URL jika tipe Audio/Video
-                        if (mediaType !== QuestionMediaType.TEXT && !mediaUrl) {
-                            throw new Error(`[SOAL ${questionNum}] URL Media wajib ada untuk tipe ${mediaType}. Tambahkan [MEDIA_URL: http://...] (Mendukung YouTube/Google Drive)`);
+                        if (mediaType !== QuestionMediaType.TEXT) {
+                            if (!mediaUrl || mediaUrl.trim() === '') {
+                                throw new Error(`[SOAL ${questionNum}] URL Media wajib ada untuk tipe ${mediaType}. Tambahkan tag [URL: http://...] atau [MEDIA_URL: http://...]`);
+                            }
+                            if (!isValidHttpUrl(mediaUrl)) {
+                                throw new Error(`[SOAL ${questionNum}] URL Media ('${mediaUrl}') tidak valid. Harap sertakan link lengkap dengan protokol HTTP atau HTTPS (seperti Google Drive atau YouTube).`);
+                            }
                         }
 
                         // 5. Ekstrak Konten Utama (Teks Soal / Instruksi)
@@ -718,6 +768,14 @@ const QuestionBank: React.FC = () => {
                             if (rawOptions.length < 2) {
                                 throw new Error(`[SOAL ${questionNum}] Soal Pilihan Ganda minimal butuh 2 opsi (A, B, C, ...). Periksa format penulisan opsi.`);
                             }
+
+                            // Cek teks opsi duplikat
+                            const optionTexts = rawOptions.map(opt => opt.text);
+                            const duplicatedOption = optionTexts.find((text, idx) => optionTexts.indexOf(text) !== idx);
+                            if (duplicatedOption) {
+                                throw new Error(`[SOAL ${questionNum}] Teks opsi jawaban tidak boleh duplikat (Ditemukan duplikasi teks: "${duplicatedOption}").`);
+                            }
+
                             const kunciTag = extractTag(['KUNCI', 'JAWABAN', 'KEY', 'CORRECT_ANSWER']).toUpperCase();
                             const kunciInlineMatch = qText.match(/KUNCI\s*:\s*([A-E])/i);
                             const correctLetter = kunciTag || (kunciInlineMatch ? kunciInlineMatch[1].toUpperCase() : '');
@@ -733,7 +791,7 @@ const QuestionBank: React.FC = () => {
                             finalOptions = rawOptions.map((opt, i) => ({ 
                                 id: `imported-${Date.now()}-${index}-o${i + 1}`, 
                                 text: opt.text 
-                            }));
+                             }));
                             correctAnswer = finalOptions[rawOptions.findIndex(opt => opt.letter === correctLetter)].id;
                         } else {
                             const kunciTag = extractTag(['KUNCI', 'JAWABAN', 'ANSWER_KEY', 'KEY']);
@@ -872,13 +930,35 @@ const QuestionBank: React.FC = () => {
 
                             <div className="p-4 bg-sky-50/50 dark:bg-sky-900/20 rounded-xl border border-sky-100 dark:border-sky-800/50">
                                 <h4 className="font-black text-[10px] uppercase tracking-widest text-sky-600 dark:text-sky-400 mb-3">Format Microsoft Word (.docx)</h4>
-                                <div className="bg-white/50 dark:bg-slate-900/50 p-3 rounded-lg font-mono text-[10px] mb-3 border border-sky-100/50 dark:border-sky-800/30">
-                                    1. Apa yang dimaksud dengan pancasila?<br/>
-                                    <span className="text-indigo-500">[SUBJEK: PKN]</span><br/>
-                                    <span className="text-indigo-500">[FASE: F]</span><br/>
-                                    A. Dasar negara Indonesia<br/>
-                                    B. Lagu kebangsaan<br/>
-                                    KUNCI: A
+                                <div className="bg-white/50 dark:bg-slate-900/50 p-3 rounded-lg font-mono text-[10px] mb-3 border border-sky-100/50 dark:border-sky-800/30 space-y-3">
+                                    <div>
+                                        1. Apa yang dimaksud dengan pancasila?<br/>
+                                        <span className="text-indigo-500">[SUBJEK: PKN]</span><br/>
+                                        <span className="text-indigo-500">[FASE: F]</span><br/>
+                                        A. Dasar negara Indonesia<br/>
+                                        B. Lagu kebangsaan<br/>
+                                        KUNCI: A
+                                    </div>
+                                    <div className="pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
+                                        2. Perhatikan video penjelasan astronomi berikut secara saksama. Mengapa planet Jupiter memiliki gravitasi sangat besar?<br/>
+                                        <span className="text-indigo-500">[SUBJEK: Fisika]</span><br/>
+                                        <span className="text-indigo-500">[FASE: F]</span><br/>
+                                        <span className="text-indigo-500">[MEDIA: Video]</span><br/>
+                                        <span className="text-indigo-500">[URL: https://www.youtube.com/watch?v=VBhIOpC3Irs]</span><br/>
+                                        A. Karena massa dan ukurannya yang sangat masif<br/>
+                                        B. Karena letaknya sangat dekat dari matahari<br/>
+                                        KUNCI: A
+                                    </div>
+                                    <div className="pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
+                                        3. Dengarkan materi audio listening bahasa inggris berikut. Apa pesan utama yang disampaikan oleh pembicara?<br/>
+                                        <span className="text-indigo-500">[SUBJEK: Bahasa Inggris]</span><br/>
+                                        <span className="text-indigo-500">[FASE: D]</span><br/>
+                                        <span className="text-indigo-500">[MEDIA: Audio]</span><br/>
+                                        <span className="text-indigo-500">[URL: https://drive.google.com/file/d/1t87Yv9U7Z80Ym6Vn7U9oE0_p3Xn8L2tY/view]</span><br/>
+                                        A. Pentingnya menjaga keragaman hayati hutan hujan tropis<br/>
+                                        B. Cara cepat mempelajari pemrograman web modern<br/>
+                                        KUNCI: A
+                                    </div>
                                 </div>
                                 <ul className="space-y-2 text-xs leading-relaxed">
                                     <li className="flex gap-2">
@@ -888,6 +968,10 @@ const QuestionBank: React.FC = () => {
                                     <li className="flex gap-2">
                                         <span className="text-sky-500 font-bold">•</span>
                                         <span>Gunakan tag dalam kurung siku untuk metadata di baris baru.</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <span className="text-sky-500 font-bold">•</span>
+                                        <span>Dukungan penuh untuk tipe media <code className="bg-white/60 dark:bg-slate-850 px-1.2 py-0.5 rounded text-[10px] font-bold">[MEDIA: Audio]</code> atau <code className="bg-white/60 dark:bg-slate-850 px-1.2 py-0.5 rounded text-[10px] font-bold">[MEDIA: Video]</code> disertai <code className="bg-white/60 dark:bg-slate-850 px-1.2 py-0.5 rounded text-[10px] font-bold">[URL: ...]</code> (YouTube atau file publik Google Drive).</span>
                                     </li>
                                 </ul>
                             </div>
@@ -1018,7 +1102,7 @@ const QuestionBank: React.FC = () => {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Teks Pengantar / Pertanyaan</label>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Teks Pengantar (promptText) <span className="text-rose-500">*</span></label>
                                     <textarea
                                         placeholder={`Tulis instruksi atau pertanyaan yang akan muncul di atas media ${newQuestion.mediaType.toLowerCase()}...`}
                                         rows={3}

@@ -18,14 +18,18 @@ const SubjectIcon: React.FC<{ subject: string }> = ({ subject }) => {
     const renderIcon = () => {
         switch(subject.toLowerCase()){
             case 'fisika':
-                return <Atom className="h-8 w-8" />;
+                return <Atom className="h-7 w-7" />;
             case 'ipa':
-                return <Microscope className="h-8 w-8" />;
+                return <Microscope className="h-7 w-7" />;
             default:
-                return <BookOpen className="h-8 w-8" />;
+                return <BookOpen className="h-7 w-7" />;
         }
     }
-    return <div className="p-3 bg-indigo-500/20 rounded-full text-indigo-600 dark:text-indigo-400">{renderIcon()}</div>
+    return (
+        <div className="p-3 bg-gradient-to-br from-indigo-500/15 to-fuchsia-500/15 rounded-2xl backdrop-blur-md border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-lg shadow-indigo-500/5">
+            {renderIcon()}
+        </div>
+    );
 }
 
 
@@ -68,11 +72,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onStartExam, 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="w-full max-w-5xl glass-card relative p-8 md:p-12 overflow-hidden border border-white/40 dark:border-white/10 shadow-2xl backdrop-blur-xl"
+      className="w-full max-w-5xl glass-card relative p-8 md:p-12 overflow-hidden border-2 border-white/60 dark:border-white/10 shadow-[0_32px_80px_rgba(0,0,0,0.1)] dark:shadow-[0_32px_80px_rgba(0,0,0,0.4)] backdrop-blur-2xl bg-white/60 dark:bg-slate-900/40 transition-colors duration-500"
     >
-      {/* Decorative background elements */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -mr-48 -mt-48 animate-pulse"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-rose-500/5 rounded-full blur-3xl -ml-48 -mb-48"></div>
+      {/* Decorative brighter aurora blobs for gorgeous glassmorphism */}
+      <div className="absolute top-[-20%] right-[-10%] w-[550px] h-[550px] bg-indigo-400/20 dark:bg-indigo-600/15 rounded-full blur-[130px] animate-pulse transition-all duration-1000 -z-10"></div>
+      <div className="absolute bottom-[-15%] left-[-15%] w-[450px] h-[450px] bg-fuchsia-400/20 dark:bg-fuchsia-600/10 rounded-full blur-[110px] animate-pulse transition-all duration-1000 delay-1000 -z-10"></div>
+      <div className="absolute top-[35%] left-[15%] w-[350px] h-[350px] bg-sky-300/15 dark:bg-sky-500/10 rounded-full blur-[100px] -z-10"></div>
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-8 relative z-10">
         <div className="flex items-center gap-8">
@@ -212,19 +217,17 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onStartExam, 
             {availableExams.map((exam, idx) => (
                 <motion.div 
                   key={exam.id}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 25 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                  className="group flex flex-col bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border border-white/60 dark:border-white/5 rounded-[2rem] p-8 hover:shadow-2xl hover:shadow-indigo-500/20 hover:-translate-y-2 transition-all duration-500 relative overflow-hidden"
+                  transition={{ delay: idx * 0.1, duration: 0.5 }}
+                  className="group flex flex-col bg-white/70 dark:bg-slate-950/45 backdrop-blur-2xl border-2 border-white/80 dark:border-white/10 rounded-[2.5rem] p-8 hover:shadow-[0_20px_50px_rgba(99,102,241,0.22)] dark:hover:shadow-[0_20px_50px_rgba(99,102,241,0.15)] hover:-translate-y-2 hover:border-indigo-450 dark:hover:border-indigo-500/70 transition-all duration-500 relative overflow-hidden"
                 >
                     {/* Card gradient glow */}
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-colors"></div>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/15 transition-all duration-700"></div>
                     
                     <div className="flex items-start justify-between mb-8 relative z-10">
-                        <div className="p-3 bg-gradient-to-br from-indigo-500/10 to-fuchsia-500/10 rounded-2xl backdrop-blur-md border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform duration-500">
-                          <BookOpen className="h-8 w-8" />
-                        </div>
-                        <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-300 bg-indigo-500/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-indigo-500/20 uppercase tracking-widest">Fase {exam.phase}</span>
+                        <SubjectIcon subject={exam.subject} />
+                        <span className="text-[9px] font-black text-indigo-650 dark:text-indigo-300 bg-indigo-500/15 backdrop-blur-md px-3.2 py-1.5 rounded-full border border-indigo-500/25 uppercase tracking-widest">Fase {exam.phase}</span>
                     </div>
                     
                     <div className="flex-grow relative z-10">

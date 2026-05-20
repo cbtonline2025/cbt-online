@@ -53,6 +53,6 @@
   }
 
   .aurora-blur {
-    @apply filter blur-[120px] opacity-30 animate-aurora mix-blend-multiply;
+    @apply filter blur-[120px] opacity-40 dark:opacity-25 animate-aurora mix-blend-multiply dark:mix-blend-screen transition-all duration-1000;
   }
 }

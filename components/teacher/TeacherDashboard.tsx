@@ -159,8 +159,13 @@ const TeacherDashboard: React.FC<{ user: User, logout: () => void }> = ({ user, 
 
 
   return (
-    <div className="w-full max-w-7xl glass-card p-10 relative overflow-hidden transition-all duration-700">
-        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-sky-400 to-emerald-500" />
+    <div className="w-full max-w-7xl glass-card p-10 relative overflow-hidden border-2 border-white/60 dark:border-white/10 shadow-[0_32px_80px_rgba(0,0,0,0.1)] dark:shadow-[0_32px_80px_rgba(0,0,0,0.4)] backdrop-blur-2xl bg-white/65 dark:bg-slate-900/40 transition-all duration-700">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-sky-400 to-emerald-500 z-20" />
+        
+        {/* Decorative brighter backdrop blobs */}
+        <div className="absolute top-[10%] left-[-15%] w-[450px] h-[450px] bg-indigo-400/15 dark:bg-indigo-600/10 rounded-full blur-[110px] animate-pulse transition-all duration-1000 -z-10"></div>
+        <div className="absolute bottom-[20%] right-[-10%] w-[400px] h-[400px] bg-emerald-400/15 dark:bg-emerald-600/10 rounded-full blur-[100px] animate-pulse transition-all duration-1000 delay-1000 -z-10"></div>
+        <div className="absolute top-[40%] right-[30%] w-[300px] h-[300px] bg-sky-300/10 dark:bg-sky-500/5 rounded-full blur-[80px] -z-10"></div>
         
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
             <div className="flex items-center gap-6">

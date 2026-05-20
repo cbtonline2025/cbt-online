@@ -152,7 +152,7 @@ const EditQuestionModal: React.FC<EditQuestionModalProps> = ({ questionId, onClo
             return;
         }
         if (!question.promptText?.trim()) {
-            setError("Teks pengantar media tidak boleh kosong.");
+            setError("Teks pengantar (promptText) tidak boleh kosong.");
             setIsSaving(false);
             return;
         }
@@ -308,16 +308,16 @@ const EditQuestionModal: React.FC<EditQuestionModalProps> = ({ questionId, onClo
                                     )}
                                 </div>
                             </div>
-                            <div className="space-y-2">
+                             <div className="space-y-2">
                                 <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">
-                                    Instruksi / Narasi Soal <span className="text-rose-500">*</span>
+                                    Teks Pengantar (promptText) <span className="text-rose-500">*</span>
                                 </label>
                                 <textarea
                                     placeholder={`Jelaskan apa yang harus dilakukan siswa dengan media ${mediaType.toLowerCase()} ini...`}
                                     rows={3}
                                     value={question.promptText || ''}
                                     onChange={(e) => handleInputChange('promptText', e.target.value)}
-                                    className={`w-full bg-white/50 dark:bg-slate-800/50 border ${!question.promptText?.trim() && error?.includes('Teks pengantar') ? 'border-rose-500' : 'border-white/60 dark:border-white/5'} rounded-3xl p-5 text-sm font-medium text-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all shadow-inner`}
+                                    className={`w-full bg-white/50 dark:bg-slate-800/50 border ${!question.promptText?.trim() && (error?.includes('Teks pengantar') || error?.includes('promptText')) ? 'border-rose-500' : 'border-white/60 dark:border-white/5'} rounded-3xl p-5 text-sm font-medium text-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all shadow-inner`}
                                 />
                                 <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider pl-1 italic">
                                     * Wajib diisi agar siswa memahami instruksi pengerjaan soal berbasis media.

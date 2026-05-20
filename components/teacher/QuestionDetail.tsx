@@ -4,7 +4,7 @@ import { Question, QuestionType, QuestionMediaType } from '../../types';
 import { fetchQuestionById } from '../../services/api';
 import Spinner from '../ui/Spinner';
 import Button from '../ui/Button';
-import { CheckCircle2, Circle, ArrowLeft, Info } from 'lucide-react';
+import { CheckCircle2, Circle, ArrowLeft, Info, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface QuestionDetailProps {
@@ -15,67 +15,107 @@ interface QuestionDetailProps {
 const DetailCard: React.FC<{ label: string; value: string; className?: string }> = ({ label, value, className }) => (
     <div className={`bg-white/60 dark:bg-slate-800/60 backdrop-blur-md p-4 rounded-2xl border border-white/40 dark:border-slate-700/50 shadow-sm ${className}`}>
         <p className="text-[10px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest mb-1 flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
             {label}
         </p>
         <p className="font-extrabold text-slate-900 dark:text-white tracking-tight">{value}</p>
     </div>
 );
 
-const getEmbedUrl = (url: string, type?: QuestionMediaType): string | null => {
-    if (!url) return null;
+const isValidUrl = (url: string): boolean => {
+    if (!url) return false;
     try {
-        if (type === QuestionMediaType.VIDEO) {
-            let videoId;
-            if (url.includes('youtube.com/watch?v=')) {
-                videoId = new URL(url).searchParams.get('v');
-            } else if (url.includes('youtu.be/')) {
-                videoId = new URL(url).pathname.substring(1);
-            }
-            if (videoId) return `https://www.youtube.com/embed/${videoId}`;
-
-            if (url.includes('drive.google.com/file/d/')) {
-                 const fileId = url.split('/d/')[1].split('/')[0];
-                 return `https://drive.google.com/file/d/${fileId}/preview`;
-            }
-        } else if (type === QuestionMediaType.AUDIO) {
-             if (url.includes('drive.google.com/file/d/')) {
-                 const fileId = url.split('/d/')[1].split('/')[0];
-                 return `https://drive.google.com/file/d/${fileId}/preview`;
-            }
-        }
-    } catch (e) {
-        console.error("Invalid URL for embedding:", url, e);
-        return url; // Return original URL as fallback
+        const parsed = new URL(url.trim());
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch (_) {
+        return false;
     }
-    return url; // Fallback for other URLs
+};
+
+const getEmbedUrl = (url: string): string | null => {
+    if (!url) return null;
+    
+    const trimmedUrl = url.trim();
+
+    // YouTube: handles watch, embed, shorts, youtu.be, and /v/
+    const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([^"&?\/\s]{11})/i;
+    const youtubeMatch = trimmedUrl.match(youtubeRegex);
+    
+    if (youtubeMatch && youtubeMatch[1]) {
+        return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+    }
+
+    // Google Drive: handles /file/d/, open?id=, and /d/
+    const driveRegex = /drive\.google\.com\/(?:file\/d\/|open\?id=|d\/)([a-zA-Z0-9_-]+)/i;
+    const driveMatch = trimmedUrl.match(driveRegex);
+    
+    if (driveMatch && driveMatch[1]) {
+        return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+    }
+
+    // Return the original URL as fallback if it looks like a direct link
+    return trimmedUrl;
 };
 
 const MediaRenderer: React.FC<{ question: Question }> = ({ question }) => {
-    const embedUrl = getEmbedUrl(question.content, question.mediaType);
-    if (!embedUrl) {
-        return <p className="text-red-500 my-4">Gagal memuat media: URL tidak valid.</p>;
+    const mediaType = question.mediaType || QuestionMediaType.TEXT;
+    const content = question.content;
+    const embedUrl = getEmbedUrl(content);
+    
+    if (!content || content.trim() === '') {
+        return (
+            <div className="my-4 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-amber-800 dark:text-amber-400 rounded-2xl text-xs font-bold leading-relaxed flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Media tidak tersedia: URL atau konten media kosong.</span>
+            </div>
+        );
     }
 
-    if (question.mediaType === QuestionMediaType.AUDIO) {
+    if (!isValidUrl(content)) {
         return (
-            <div className="my-4">
+            <div className="my-4 p-5 bg-rose-50 dark:bg-rose-950/20 border-2 border-rose-200 dark:border-rose-950/50 text-rose-900 dark:text-rose-450 rounded-2xl flex items-start gap-4 shadow-sm">
+                <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5 animate-pulse" />
+                <div>
+                    <h5 className="font-black text-sm text-rose-800 dark:text-rose-300">URL Media Tidak Valid</h5>
+                    <p className="text-xs opacity-90 mt-1">Harap berikan URL yang memiliki protokol HTTP/HTTPS lengkap (contoh: dari YouTube, Google Drive, atau link file audio/video langsung).</p>
+                    <code className="block mt-2.5 text-[10px] p-2 bg-black/5 dark:bg-black/30 rounded font-mono truncate max-w-full">{content}</code>
+                </div>
+            </div>
+        );
+    }
+
+    const isDrive = embedUrl ? embedUrl.includes('drive.google.com') : false;
+    const isYouTube = embedUrl ? embedUrl.includes('youtube.com/embed') : false;
+
+    if (mediaType === QuestionMediaType.AUDIO) {
+        if (isDrive) {
+            return (
+                <div className="my-4 w-full h-42 bg-slate-100 dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-inner">
+                    <iframe
+                        src={embedUrl || undefined}
+                        frameBorder="0"
+                        className="w-full h-full"
+                        title={`Audio dari Drive - ${question.id}`}
+                    ></iframe>
+                </div>
+            );
+        }
+        return (
+            <div className="my-4 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                  <audio controls className="w-full" key={question.id}>
-                    <source src={embedUrl} />
+                    <source src={embedUrl || undefined} />
                     Browser Anda tidak mendukung elemen audio.
                 </audio>
             </div>
         );
     }
 
-    if (question.mediaType === QuestionMediaType.VIDEO) {
-        const isEmbed = embedUrl.includes('youtube.com/embed') || embedUrl.includes('drive.google.com');
-
+    if (mediaType === QuestionMediaType.VIDEO) {
         return (
-            <div className="my-4 w-full aspect-video bg-black rounded-lg shadow-lg overflow-hidden">
-                {isEmbed ? (
+            <div className="my-4 w-full aspect-video bg-black rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+                {(isYouTube || isDrive) ? (
                     <iframe
-                        src={embedUrl}
+                        src={embedUrl || undefined}
                         frameBorder="0"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
@@ -84,7 +124,7 @@ const MediaRenderer: React.FC<{ question: Question }> = ({ question }) => {
                     ></iframe>
                 ) : (
                     <video 
-                        src={embedUrl} 
+                        src={embedUrl || undefined} 
                         controls 
                         className="w-full h-full"
                         key={question.id}

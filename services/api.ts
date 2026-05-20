@@ -157,6 +157,53 @@ const initialQuestions: Question[] = [
       ], 
       correctAnswer: 'q15o3' 
     },
+    // Fase F (SMA) - Seni Budaya (Audio Direct) - Identifikasi Instrumen Utama
+    { 
+      id: 'q16', 
+      type: QuestionType.MULTIPLE_CHOICE, 
+      mediaType: QuestionMediaType.AUDIO,
+      promptText: 'Dengarkan rekaman instrumen audio musik klasik berikut. Alat musik apa yang mendominasi melodi utama pada 15 detik pertama lagu tersebut?',
+      content: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+      subject: 'Seni Budaya', 
+      phase: 'F', 
+      options: [
+          {id: 'q16o1', text: 'Piano'}, 
+          {id: 'q16o2', text: 'Gitar Listrik'}, 
+          {id: 'q16o3', text: 'Seruling Bambu'}, 
+          {id: 'q16o4', text: 'Suling Sunda'},
+          {id: 'q16o5', text: 'Harmonika'}
+      ], 
+      correctAnswer: 'q16o1' 
+    },
+    // Fase F (SMA) - Fisika (Video YouTube) - Gravitasi Jupiter
+    { 
+      id: 'q17', 
+      type: QuestionType.MULTIPLE_CHOICE, 
+      mediaType: QuestionMediaType.VIDEO,
+      promptText: 'Tonton video penjelasan sains astronomi berikut. Mengapa planet Jupiter memiliki daya tarik gravitasi yang sangat kuat dibandingkan dengan bumi?',
+      content: 'https://www.youtube.com/watch?v=VBhIOpC3Irs',
+      subject: 'Fisika', 
+      phase: 'F', 
+      options: [
+          {id: 'q17o1', text: 'Karena rotasi Jupiter sangat lambat'}, 
+          {id: 'q17o2', text: 'Karena Jupiter memiliki massa dan volume yang sangat besar'}, 
+          {id: 'q17o3', text: 'Karena jarak Jupiter sangat dekat dengan matahari'}, 
+          {id: 'q17o4', text: 'Karena cincinnya memancarkan medan magnet kuat'},
+          {id: 'q17o5', text: 'Karena atmosfernya kaya akan gas oksigen'}
+      ], 
+      correctAnswer: 'q17o2' 
+    },
+    // Fase D (SMP) - IPS (Video YouTube) - Dokumenter Kebudayaan
+    { 
+      id: 'q18', 
+      type: QuestionType.ESSAY, 
+      mediaType: QuestionMediaType.VIDEO,
+      promptText: 'Saksikan dokumenter kebudayaan berikut ini secara seksama. Analisis dan paparkan minimal 3 tantangan pelestarian seni tradisional di era digital modern berdasarkan kesimpulan dari video tersebut!',
+      content: 'https://www.youtube.com/watch?v=R_iMAEWkulA',
+      subject: 'IPS', 
+      phase: 'D', 
+      correctAnswer: 'Tantangan pelestarian seni tradisional antara lain: 1) Kurangnya minat generasi muda terhadap seni kebudayaan, 2) Komparasi persaingan ketat dengan konten hiburan digital modern global, dan 3) Minimnya wadah pertunjukan fisik di lingkungan urban.'
+    },
 ];
 
 // --- Local Storage Keys ---
@@ -203,11 +250,24 @@ const saveQuestions = () => {
     }
 };
 
+// Synchronize initial questions with stored copy
+let __updated = false;
+initialQuestions.forEach(initQ => {
+    if (!mockQuestions.some(q => q.id === initQ.id)) {
+        mockQuestions.push(initQ);
+        __updated = true;
+    }
+});
+if (__updated) {
+    saveQuestions();
+}
+
 
 export const mockExams: Exam[] = [
-    { id: 'exam-fisika-1', title: 'Ujian Akhir Semester Fisika', subject: 'Fisika', phase: 'F', durationMinutes: 90, questionIds: ['q1', 'q2', 'q3', 'q10'] },
-    { id: 'exam-ipa-1', title: 'Latihan ANBK IPA', subject: 'IPA', phase: 'D', durationMinutes: 60, questionIds: ['q4', 'q5', 'q6', 'q7', 'q9'] },
-    { id: 'exam-bing-1', title: 'Listening Comprehension', subject: 'Bahasa Inggris', phase: 'F', durationMinutes: 45, questionIds: ['q8', 'q11'] }
+    { id: 'exam-fisika-1', title: 'Ujian Akhir Semester Fisika', subject: 'Fisika', phase: 'F', durationMinutes: 90, questionIds: ['q1', 'q2', 'q3', 'q10', 'q17'] },
+    { id: 'exam-ipa-1', title: 'Latihan ANBK IPA', subject: 'IPA', phase: 'D', durationMinutes: 60, questionIds: ['q4', 'q5', 'q6', 'q7', 'q9', 'q18'] },
+    { id: 'exam-bing-1', title: 'Listening Comprehension', subject: 'Bahasa Inggris', phase: 'F', durationMinutes: 45, questionIds: ['q8', 'q11', 'q16'] },
+    { id: 'exam-multimedia-1', title: 'Simulasi Ujian Multimedia (AKM)', subject: 'Seni dan Seni Suara', phase: 'F', durationMinutes: 30, questionIds: ['q16', 'q17', 'q18', 'q15'] }
 ];
 
 // Mock API functions
