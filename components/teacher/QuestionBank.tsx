@@ -421,17 +421,24 @@ const QuestionBank: React.FC = () => {
                     
                     // Check for required headers before parsing rows
                     const headerRow = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] as string[];
+                    if (!headerRow) {
+                        throw new Error("File Excel kosong atau tidak memiliki baris header.");
+                    }
                     const requiredHeaders = ['content', 'type', 'subject', 'phase', 'correctAnswer'];
                     const missingHeaders = requiredHeaders.filter(h => !headerRow?.includes(h));
                     
                     if (missingHeaders.length > 0) {
-                        throw new Error(`File Excel tidak memiliki kolom yang diwajibkan: ${missingHeaders.join(', ')}. Harap pastikan nama kolom di baris pertama sudah benar.`);
+                        throw new Error(`File Excel tidak memiliki kolom yang diwajibkan: ${missingHeaders.join(', ')}. Harap pastikan nama kolom di baris pertama sudah benar (case-sensitive).`);
                     }
 
-                    const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+                    const rawJson = XLSX.utils.sheet_to_json(worksheet) as any[];
+                    // Filter out completely empty rows
+                    const json = rawJson.filter(row => {
+                        return Object.values(row).some(val => val !== undefined && val !== null && String(val).trim() !== '');
+                    });
 
                     if (json.length === 0) {
-                        throw new Error("File Excel terbaca, namun tidak ditemukan baris data soal di bawah baris judul (header).");
+                        throw new Error("File Excel terbaca, namun tidak ditemukan baris data soal yang terisi di bawah baris judul (header).");
                     }
 
                     const isValidHttpUrl = (str: string) => {
