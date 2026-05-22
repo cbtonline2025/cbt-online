@@ -17,19 +17,21 @@ export enum View {
 }
 
 export interface StudentData {
-  nisn: string;
+  nisn?: string;
   fullName: string;
   class: string; // e.g., 'X-A', 'VII-B'
   school: string;
   city: string;
   province: string;
+  password?: string;
 }
 
 export interface User {
   id: string;
-  username: string; // For students, username is NISN
+  username: string; // For students, username is generated or NISN
   fullName: string;
   role: Role;
+  password?: string;
   details?: StudentData | any; // More specific types for teacher/admin can be added
 }
 

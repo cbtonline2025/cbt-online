@@ -13,6 +13,7 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onRegisterClick }) => {
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<Role>(Role.STUDENT);
   const { login } = useContext(AuthContext);
 
@@ -20,9 +21,9 @@ const Login: React.FC<LoginProps> = ({ onRegisterClick }) => {
     e.preventDefault();
     const finalUsername = username.trim();
     if (finalUsername) {
-      login(finalUsername, selectedRole);
+      login(finalUsername, selectedRole, password.trim());
     } else {
-      alert("Username/NISN tidak boleh kosong.");
+      alert("Username tidak boleh kosong.");
     }
   };
 
@@ -66,17 +67,32 @@ const Login: React.FC<LoginProps> = ({ onRegisterClick }) => {
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="space-y-2">
-          <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] pl-1">Identitas Pengguna</label>
-          <Input 
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="NISN atau Nama Pengguna"
-            icon={<UserCircle className="w-5 h-5 text-slate-400" />}
-            className="rounded-[1.25rem] py-5 border-white/40 dark:border-white/5 bg-white/30 dark:bg-slate-950/20"
-            required
-          />
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] pl-1">Identitas Pengguna</label>
+            <Input 
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="NISN atau Nama Pengguna"
+              icon={<UserCircle className="w-5 h-5 text-slate-400" />}
+              className="rounded-[1.25rem] py-5 border-white/40 dark:border-white/5 bg-white/30 dark:bg-slate-950/20"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] pl-1">Kata Sandi / PIN</label>
+            <Input 
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Masukkan PIN Ujian Anda (jika ada)"
+              icon={<KeyRound className="w-5 h-5 text-slate-400" />}
+              className="rounded-[1.25rem] py-5 border-white/40 dark:border-white/5 bg-white/30 dark:bg-slate-950/20"
+            />
+          </div>
         </div>
         
         <div className="space-y-4">

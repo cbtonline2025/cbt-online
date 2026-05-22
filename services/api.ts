@@ -292,21 +292,35 @@ export const fetchNISNData = async (nisn: string): Promise<StudentData | null> =
 export const registerNewStudent = async (studentData: StudentData): Promise<{user: User | null, error?: string}> => {
     return new Promise((resolve) => {
         setTimeout(() => {
-            const existingUser = mockUsers.find(u => u.username === studentData.nisn);
-            if (existingUser) {
-                resolve({ user: null, error: 'Pengguna dengan NISN ini sudah terdaftar.' });
-                return;
-            }
+            const cleanName = studentData.fullName
+                .trim()
+                .split(/\s+/)[0]
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, '');
+            const randomDigits = Math.floor(1000 + Math.random() * 9000);
+            const generatedUsername = `${cleanName}${randomDigits}`;
+            const generatedPassword = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit PIN
+            
+            // Generate dummy NISN (10 digits) if not provided for backward compatibility
+            const simulatedNisn = studentData.nisn || `00${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+            const updatedStudentData: StudentData = {
+                ...studentData,
+                nisn: simulatedNisn,
+                password: generatedPassword,
+            };
 
             const newStudentUser: User = {
                 id: `user-${Date.now()}`,
-                username: studentData.nisn,
+                username: generatedUsername,
                 fullName: studentData.fullName,
                 role: Role.STUDENT,
-                details: studentData,
+                password: generatedPassword,
+                details: updatedStudentData,
             };
+
             mockUsers.push(newStudentUser);
-            mockNISNData[studentData.nisn] = studentData;
+            mockNISNData[simulatedNisn] = updatedStudentData;
             saveUsers();
             resolve({ user: newStudentUser });
         }, 300);

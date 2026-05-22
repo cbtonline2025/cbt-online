@@ -4,10 +4,11 @@ import { User } from '../../types';
 import ResultsAnalysis from './ResultsAnalysis';
 import Button from '../ui/Button';
 import QuestionBank from './QuestionBank';
-import { Database, PlusCircle, BarChart3, ChevronLeft, LogOut, ArrowRight, BookOpen, Settings } from 'lucide-react';
+import DeploymentGuide from './DeploymentGuide';
+import { Database, PlusCircle, BarChart3, ChevronLeft, LogOut, ArrowRight, BookOpen, Settings, HelpCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
-type TeacherView = 'dashboard' | 'question_bank' | 'exam_creator' | 'results';
+type TeacherView = 'dashboard' | 'question_bank' | 'exam_creator' | 'results' | 'guide';
 
 const DashboardCard: React.FC<{ 
     title: string; 
@@ -101,6 +102,8 @@ const TeacherDashboard: React.FC<{ user: User, logout: () => void }> = ({ user, 
             return <ResultsAnalysis />;
         case 'question_bank':
             return <QuestionBank />;
+        case 'guide':
+            return <DeploymentGuide />;
         case 'dashboard':
         default:
             return (
@@ -129,6 +132,13 @@ const TeacherDashboard: React.FC<{ user: User, logout: () => void }> = ({ user, 
                             onClick={() => setView('results')}
                             color="emerald"
                             icon={<BarChart3 className="h-7 w-7" />}
+                        />
+                        <DashboardCard
+                            title="Panduan Distribusi Massal"
+                            description="Cara host gratis selamanya di Cloud & SOP pengerjaan massal bebas server down."
+                            onClick={() => setView('guide')}
+                            color="violet"
+                            icon={<HelpCircle className="h-7 w-7" />}
                         />
                         <DashboardCard
                             title="Konfigurasi Ujian"

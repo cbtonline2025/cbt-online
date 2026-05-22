@@ -16,7 +16,7 @@ import Logo from './components/ui/Logo';
 
 export const AuthContext = React.createContext<{
   user: User | null;
-  login: (username: string, role: Role) => void;
+  login: (username: string, role: Role, password?: string) => void;
   logout: () => void;
   registerStudent: (studentData: StudentData) => void;
 }>({
@@ -38,9 +38,13 @@ const App: React.FC = () => {
     setIsDarkMode(prev => !prev);
   }, []);
 
-  const login = useCallback((username: string, role: Role) => {
+  const login = useCallback((username: string, role: Role, password?: string) => {
     const user = mockUsers.find(u => u.username.toLowerCase() === username.toLowerCase() && u.role === role);
     if (user) {
+      if (user.password && password !== undefined && user.password !== password) {
+         alert("Password salah! Harap periksa dan ketikkan password Anda secara benar.");
+         return;
+      }
       setCurrentUser(user);
       switch(user.role) {
         case Role.STUDENT:
@@ -56,14 +60,17 @@ const App: React.FC = () => {
     } else {
       // In a real app, you would show an error message.
       console.error("Login failed");
-      alert("Login Gagal! Pastikan username dan peran Anda benar.");
+      alert("Login Gagal! Pastikan username/peran Anda benar.");
     }
   }, []);
 
   const registerStudent = useCallback(async (studentData: StudentData) => {
     const result = await registerNewStudent(studentData);
     if (result.user) {
-        setTempStudentData(studentData);
+        setTempStudentData({
+            ...result.user.details,
+            username: result.user.username,
+        });
         setCurrentView(View.CONFIRM_DATA);
     } else {
         alert(result.error || 'Terjadi kesalahan saat registrasi.');
@@ -156,7 +163,7 @@ const App: React.FC = () => {
         <AuroraBackground />
         
         {/* Global Header */}
-        <header className="relative z-20 w-full px-6 py-4 flex justify-between items-center bg-white/40 backdrop-blur-md border-b border-white/60 shadow-sm">
+        <header className="relative z-20 w-full px-6 py-4 flex justify-between items-center bg-white/40 dark:bg-slate-950/40 backdrop-blur-md border-b border-slate-200/50 dark:border-white/5 shadow-sm">
           <Logo showAuthor={true} />
           <ThemeToggle isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
         </header>

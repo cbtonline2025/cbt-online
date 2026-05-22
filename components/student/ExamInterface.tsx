@@ -7,6 +7,7 @@ import QuestionPanel from './QuestionPanel';
 import NavigationPanel from './NavigationPanel';
 import Button from '../ui/Button';
 import { useAntiCheat } from '../../hooks/useAntiCheat';
+import { AlertTriangle } from 'lucide-react';
 
 interface ExamInterfaceProps {
   examId: string;
@@ -23,6 +24,8 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
   const [timeLeft, setTimeLeft] = useState(0);
 
   const [violationMessage, setViolationMessage] = useState<string | null>(null);
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [confirmChecked, setConfirmChecked] = useState(false);
 
   const handleAntiCheat = useCallback((type: 'visibility' | 'blur') => {
     const msg = type === 'visibility' ? 'Deteksi Perpindahan Tab' : 'Deteksi Keluar Jendela';
@@ -80,39 +83,41 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
     setAnswers(prev => prev.map(a => a.questionId === questionId ? { ...a, isDoubtful: !a.isDoubtful } : a));
   };
   
+  const performSubmission = useCallback(() => {
+    if(!exam) return;
+
+    // Simple scoring logic for demo
+    const correctAnswers = answers.filter(ans => {
+        const question = questions.find(q => q.id === ans.questionId);
+        return question && question.correctAnswer === ans.answer;
+    }).length;
+    const score = (correctAnswers / questions.length) * 100;
+
+    const result: ExamResult = {
+        examId: exam.id,
+        studentId: user.id,
+        score: score,
+        answers: answers,
+        startedAt: new Date(Date.now() - exam.durationMinutes * 60 * 1000), // Approximate start time
+        finishedAt: new Date(),
+    };
+    onFinishExam(result);
+  }, [exam, answers, onFinishExam, questions, user.id]);
+
   const handleSubmit = useCallback((isAutoSubmit: boolean = false, reason?: string) => {
     if(!exam) return;
 
-    const confirmSubmit = () => {
-        // Simple scoring logic for demo
-        const correctAnswers = answers.filter(ans => {
-            const question = questions.find(q => q.id === ans.questionId);
-            return question && question.correctAnswer === ans.answer;
-        }).length;
-        const score = (correctAnswers / questions.length) * 100;
-
-        const result: ExamResult = {
-            examId: exam.id,
-            studentId: user.id,
-            score: score,
-            answers: answers,
-            startedAt: new Date(Date.now() - exam.durationMinutes * 60 * 1000), // Approximate start time
-            finishedAt: new Date(),
-        };
-        onFinishExam(result);
-    }
-    
     if(isAutoSubmit) {
         if (reason) {
           alert(reason);
         } else {
           alert("Waktu habis! Ujian akan diselesaikan secara otomatis.");
         }
-        confirmSubmit();
-    } else if (window.confirm("Apakah Anda yakin ingin menyelesaikan ujian ini?")) {
-        confirmSubmit();
+        performSubmission();
+    } else {
+        setIsSubmitModalOpen(true);
     }
-  }, [exam, answers, onFinishExam, questions, user.id]);
+  }, [exam, performSubmission]);
 
   if (isLoading) {
     return (
@@ -234,6 +239,98 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
                 AKSES SELESAI
             </Button>
         </div>
+
+        {/* Custom Confirmation Modal */}
+        {isSubmitModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in text-slate-800 dark:text-white">
+            <div className="w-full max-w-lg glass-card border-none bg-white dark:bg-slate-950 p-8 rounded-3xl shadow-2xl relative overflow-hidden space-y-6">
+              {/* Top accent */}
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-rose-500 to-indigo-500" />
+              
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-amber-500/10 dark:bg-amber-500/20 rounded-2xl flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">Konfirmasi Selesai Ujian</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Harap periksa kembali detail pengerjaan Anda sebelum mengirim jawaban.</p>
+                </div>
+              </div>
+
+              {/* Progress Cards */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-2xl text-center">
+                  <div className="text-xl font-black text-emerald-600 dark:text-emerald-450 font-mono">{answers.filter(a => a.answer !== '').length}</div>
+                  <div className="text-[9px] font-black uppercase text-emerald-600/70 dark:text-emerald-400/70 tracking-wider">Terjawab</div>
+                </div>
+                <div className="bg-rose-500/10 border border-rose-500/20 p-3 rounded-2xl text-center">
+                  <div className="text-xl font-black text-rose-600 dark:text-rose-450 font-mono">{questions.length - answers.filter(a => a.answer !== '').length}</div>
+                  <div className="text-[9px] font-black uppercase text-rose-600/70 dark:text-rose-400/70 tracking-wider">Belum Terisi</div>
+                </div>
+                <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-2xl text-center">
+                  <div className="text-xl font-black text-amber-600 dark:text-amber-450 font-mono">{answers.filter(a => a.isDoubtful).length}</div>
+                  <div className="text-[9px] font-black uppercase text-amber-600/70 dark:text-amber-400/70 tracking-wider">Ragu-ragu</div>
+                </div>
+              </div>
+
+              {questions.length - answers.filter(a => a.answer !== '').length > 0 && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs text-rose-700 dark:text-rose-400 font-bold flex items-center gap-2">
+                  <span>⚠️ Perhatian: Ada {questions.length - answers.filter(a => a.answer !== '').length} soal yang belum Anda jawab!</span>
+                </div>
+              )}
+
+              {answers.filter(a => a.isDoubtful).length > 0 && (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs text-amber-700 dark:text-amber-400 font-bold flex items-center gap-2">
+                  <span>⚠️ Perhatian: Anda masih menandai {answers.filter(a => a.isDoubtful).length} soal sebagai ragu-ragu!</span>
+                </div>
+              )}
+
+              {/* Accidental Checkbox Double-Security */}
+              <label className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800/80 cursor-pointer">
+                <input 
+                  id="chk-confirm-submit"
+                  type="checkbox" 
+                  checked={confirmChecked}
+                  onChange={(e) => setConfirmChecked(e.target.checked)}
+                  className="mt-1 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 h-4 w-4 shrink-0 cursor-pointer"
+                />
+                <span className="text-xs text-slate-600 dark:text-slate-300 font-bold leading-relaxed">
+                  Saya menyatakan secara sadar telah menyelesaikan pengerjaan ujian ini dan siap mengirim semua jawaban untuk dinilai.
+                </span>
+              </label>
+
+              {/* Button controls */}
+              <div className="flex gap-4 pt-2">
+                <Button 
+                  id="btn-modal-cancel"
+                  onClick={() => {
+                    setIsSubmitModalOpen(false);
+                    setConfirmChecked(false);
+                  }} 
+                  variant="secondary" 
+                  className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-xs font-black uppercase tracking-widest rounded-2xl border-none hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                >
+                  Kembali
+                </Button>
+                <Button 
+                  id="btn-modal-confirm-submit"
+                  onClick={() => {
+                    if (confirmChecked) {
+                      setIsSubmitModalOpen(false);
+                      setConfirmChecked(false);
+                      performSubmission();
+                    }
+                  }}
+                  disabled={!confirmChecked}
+                  variant="danger"
+                  className="flex-1 py-4 text-xs font-black uppercase tracking-widest rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed bg-rose-600 hover:bg-rose-500 border-none transition-all text-white"
+                >
+                  Kirim Jawaban
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 };
