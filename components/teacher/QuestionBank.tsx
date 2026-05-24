@@ -2,6 +2,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import { FileText, Video, Music, Edit, Eye, Search, Filter, RefreshCw, Download, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Question, QuestionType, QuestionOption, QuestionMediaType } from '../../types';
 import { addQuestions, mockQuestions } from '../../services/api';
@@ -33,7 +34,7 @@ const QuestionBank: React.FC = () => {
     // State for importing
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isParsing, setIsParsing] = useState(false);
-    const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error', text: string, count?: number, fileName?: string } | null>(null);
     const [questions, setQuestions] = useState<Question[]>(mockQuestions);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,6 +118,173 @@ const QuestionBank: React.FC = () => {
         }
     };
 
+    const handleDownloadWordTemplate = async () => {
+        try {
+            const doc = new Document({
+                sections: [
+                    {
+                        properties: {},
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({
+                                        text: "TEMPLATE FORMAT IMPOR SOAL - CBT KURIKULUM MERDEKA",
+                                        bold: true,
+                                        size: 28, // 14pt
+                                        color: "1E293B"
+                                    })
+                                ],
+                                heading: HeadingLevel.HEADING_1,
+                                alignment: AlignmentType.CENTER,
+                                spacing: { after: 300 }
+                            }),
+                            new Paragraph({
+                                children: [
+                                    new TextRun({
+                                        text: "PETUNJUK IMPOR SOAL PENTING:",
+                                        bold: true,
+                                        color: "4F46E5"
+                                    })
+                                ],
+                                spacing: { before: 200, after: 100 }
+                            }),
+                            new Paragraph({ text: "1. Setiap soal wajib diawali dengan angka penomoran diikuti tanda titik atau kurung tutup (contoh: 1. atau 1))." }),
+                            new Paragraph({ text: "2. Masukkan metadata [SUBJEK: Nama Mapel] dan [FASE: D/E/F] di bawah teks soal pada baris baru." }),
+                            new Paragraph({ text: "3. Untuk multimedia, opsional tambahkan [MEDIA: Audio/Video] dan [URL: https://...] di baris baru." }),
+                            new Paragraph({ text: "4. Opsi pilihan ganda diawali huruf A s/d E diikuti titik atau kurung tutup (contoh: A. Pilihan A)." }),
+                            new Paragraph({ text: "5. Tulis kunci di baris terakhir dengan format \"KUNCI: A\" (untuk Pilihan Ganda) atau \"KUNCI: Pedoman Jawaban\" (untuk Esai)." }),
+                            new Paragraph({ text: "6. Jika tidak menyertakan opsi pilihan ganda (A, B, C...), soal otomatis dideteksi sebagai soal Esai." }),
+                            new Paragraph({ text: "--------------------------------------------------------", spacing: { before: 200, after: 200 } }),
+
+                            // Soal 1
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: "1. Apa yang dimaksud dengan Pancasila sebagai dasar negara?", bold: true })
+                                ],
+                                spacing: { before: 150 }
+                            }),
+                            new Paragraph({ text: "[SUBJEK: Pendidikan Pancasila]" }),
+                            new Paragraph({ text: "[FASE: F]" }),
+                            new Paragraph({ text: "A. Dasar negara Indonesia dan sumber dari segala sumber hukum" }),
+                            new Paragraph({ text: "B. Lambang negara dan lagu kebangsaan saja" }),
+                            new Paragraph({ text: "C. Program kerja pemerintah dalam pembangunan nasional" }),
+                            new Paragraph({ text: "D. Nama pulau terbesar di wilayah kedaulatan nusantara" }),
+                            new Paragraph({ text: "E. Peraturan daerah tingkat provinsi DKI Jakarta" }),
+                            new Paragraph({ text: "KUNCI: A", spacing: { after: 200 } }),
+
+                            // Soal 2
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: "2. Perhatikan video penjelasan astronomi berikut secara saksama. Mengapa planet Jupiter memiliki daya gravitasi yang sangat besar?", bold: true })
+                                ],
+                                spacing: { before: 150 }
+                            }),
+                            new Paragraph({ text: "[SUBJEK: Fisika]" }),
+                            new Paragraph({ text: "[FASE: F]" }),
+                            new Paragraph({ text: "[MEDIA: Video]" }),
+                            new Paragraph({ text: "[URL: https://www.youtube.com/watch?v=VBhIOpC3Irs]" }),
+                            new Paragraph({ text: "A. Karena massa dan ukurannya yang sangat masif dibanding planet lain" }),
+                            new Paragraph({ text: "B. Karena letaknya sangat dekat dari matahari" }),
+                            new Paragraph({ text: "C. Karena memiliki jumlah cincin es yang sangat tebal" }),
+                            new Paragraph({ text: "D. Karena atmosfernya tidak mengandung helium" }),
+                            new Paragraph({ text: "E. Karena mengitari matahari lebih cepat" }),
+                            new Paragraph({ text: "KUNCI: A", spacing: { after: 200 } }),
+
+                            // Soal 3
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: "3. Sebutkan 3 contoh sumber energi terbarukan yang potensial dikembangkan di Indonesia beserta pemanfaatannya!", bold: true })
+                                ],
+                                spacing: { before: 150 }
+                            }),
+                            new Paragraph({ text: "[SUBJEK: IPA]" }),
+                            new Paragraph({ text: "[FASE: D]" }),
+                            new Paragraph({ text: "[TIPE: Esai]" }),
+                            new Paragraph({ text: "KUNCI: Contoh energi terbarukan di Indonesia: 1) Energi Surya (pemanfaatan sel surya/PLTS), 2) Energi Air (pembangunan PLTA skala mikrohidro), dan 3) Geotermal/panas bumi (pembangkit listrik di daerah vulkanik).", spacing: { after: 200 } })
+                        ]
+                    }
+                ]
+            });
+
+            const blob = await Packer.toBlob(doc);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "template_impor_soal_word.docx";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (err: any) {
+            alert("Gagal mengunduh template Word: " + err.message);
+        }
+    };
+
+    const handleDownloadExcelTemplate = () => {
+        try {
+            const headers = [
+                'content', 'type', 'subject', 'phase', 
+                'optionA', 'optionB', 'optionC', 'optionD', 'optionE', 
+                'correctAnswer', 'mediaType', 'mediaUrl', 'promptText'
+            ];
+            
+            const data = [
+                {
+                    content: "Sebuah benda bergerak dengan kecepatan konstan 5 m/s. Berapa jarak yang ditempuh benda tersebut setelah 10 detik?",
+                    type: "Pilihan Ganda",
+                    subject: "Fisika",
+                    phase: "F",
+                    optionA: "25 m",
+                    optionB: "50 m",
+                    optionC: "100 m",
+                    optionD: "10 m",
+                    optionE: "5 m",
+                    correctAnswer: "B",
+                    mediaType: "Teks",
+                    mediaUrl: "",
+                    promptText: ""
+                },
+                {
+                    content: "https://www.youtube.com/watch?v=VBhIOpC3Irs",
+                    type: "Pilihan Ganda",
+                    subject: "Fisika",
+                    phase: "F",
+                    optionA: "Karena massa dan ukurannya yang sangat masif dibanding planet lain",
+                    optionB: "Karena letaknya sangat dekat dari matahari",
+                    optionC: "Karena cincin es",
+                    optionD: "Karena gas saja",
+                    optionE: "Karena revolusi",
+                    correctAnswer: "A",
+                    mediaType: "Video",
+                    mediaUrl: "https://www.youtube.com/watch?v=VBhIOpC3Irs",
+                    promptText: "Perhatikan video penjelasan astronomi berikut secara saksama. Mengapa planet Jupiter memiliki gravitasi sangat besar?"
+                },
+                {
+                    content: "Sebutkan 3 contoh sumber energi terbarukan yang potensial dikembangkan di Indonesia!",
+                    type: "Esai",
+                    subject: "IPA",
+                    phase: "D",
+                    optionA: "",
+                    optionB: "",
+                    optionC: "",
+                    optionD: "",
+                    optionE: "",
+                    correctAnswer: "1. Energi Air (pembangkit listrik), 2. Energi Panas Bumi (panas bumi), 3. Energi Matahari (sel surya).",
+                    mediaType: "Teks",
+                    mediaUrl: "",
+                    promptText: ""
+                }
+            ];
+
+            const worksheet = XLSX.utils.json_to_sheet(data, { header: headers });
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Template Soal");
+            XLSX.writeFile(workbook, "template_impor_soal_excel.xlsx");
+        } catch (err: any) {
+            alert("Gagal mengunduh template Excel: " + err.message);
+        }
+    };
+
     const handleImport = async () => {
         if (!selectedFile) {
             setImportMessage({ type: 'error', text: 'Silakan pilih file terlebih dahulu.' });
@@ -138,7 +306,12 @@ const QuestionBank: React.FC = () => {
             if (newQuestions.length > 0) {
                 await addQuestions(newQuestions);
                 setQuestions(prev => [...prev, ...newQuestions]);
-                setImportMessage({ type: 'success', text: `Berhasil! ${newQuestions.length} soal baru telah ditambahkan ke bank soal Anda.` });
+                setImportMessage({ 
+                    type: 'success', 
+                    text: `Berhasil! ${newQuestions.length} soal baru telah ditambahkan ke bank soal Anda.`,
+                    count: newQuestions.length,
+                    fileName: selectedFile.name
+                });
             } else {
                 setImportMessage({ type: 'error', text: 'Tidak ada soal yang dapat diimpor dari file. Periksa format file Anda.' });
             }
@@ -909,6 +1082,34 @@ const QuestionBank: React.FC = () => {
                             {isParsing && <Spinner size="small" />}
                             {isParsing ? 'Sedang Mengimpor...' : 'Impor Sekarang'}
                         </Button>
+
+                        <div className="mt-6 pt-6 border-t border-slate-200/40 dark:border-slate-700/50">
+                            <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-1.5">
+                                <Download className="w-4 h-4 text-indigo-500" />
+                                Template Format Impor
+                            </h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Unduh template acuan untuk mempermudah penyusunan soal massal:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <button 
+                                    onClick={handleDownloadWordTemplate}
+                                    type="button"
+                                    className="flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-900/30 transition-all active:scale-[0.98] cursor-pointer shadow-sm hover:shadow"
+                                    title="Unduh format Microsoft Word (.docx)"
+                                >
+                                    <FileText className="w-3.5 h-3.5 text-indigo-500" />
+                                    Template Word (.docx)
+                                </button>
+                                <button 
+                                    onClick={handleDownloadExcelTemplate}
+                                    type="button"
+                                    className="flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-900/30 transition-all active:scale-[0.98] cursor-pointer shadow-sm hover:shadow"
+                                    title="Unduh format Microsoft Excel (.xlsx)"
+                                >
+                                    <FileText className="w-3.5 h-3.5 text-emerald-500" />
+                                    Template Excel (.xlsx)
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div className="bg-white/30 dark:bg-slate-900/50 p-6 rounded-lg text-sm text-slate-700 dark:text-slate-300">
                         <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
@@ -992,37 +1193,89 @@ const QuestionBank: React.FC = () => {
 
                 {importMessage && (
                   <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`p-6 rounded-2xl border-2 flex items-start gap-4 mb-8 shadow-lg shadow-indigo-500/5 ${
+                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    className={`rounded-2xl border-2 p-6 mb-8 shadow-xl transition-all ${
                         importMessage.type === 'success' 
-                        ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900 dark:bg-emerald-900/20 dark:border-emerald-800/50 dark:text-emerald-300' 
-                        : 'bg-rose-50/80 border-rose-200 text-rose-900 dark:bg-rose-900/20 dark:border-rose-800/50 dark:text-rose-300'
+                        ? 'bg-emerald-50/90 border-emerald-500/40 text-emerald-950 dark:bg-emerald-950/30 dark:border-emerald-500/30 dark:text-emerald-100 shadow-emerald-500/5' 
+                        : 'bg-rose-50/90 border-rose-200 text-rose-900 dark:bg-rose-950/30 dark:border-rose-800/50 dark:text-rose-300 shadow-rose-500/5'
                     }`}
                   >
-                        <div className={`p-2 rounded-xl shrink-0 ${
-                            importMessage.type === 'success' ? 'bg-emerald-500/10' : 'bg-rose-500/10'
-                        }`}>
-                            {importMessage.type === 'success' ? (
-                                <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                            ) : (
-                                <AlertCircle className="w-6 h-6 text-rose-600 dark:text-rose-400" />
-                            )}
+                    {importMessage.type === 'success' ? (
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div className="flex items-start gap-4">
+                                <div className="p-3 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-2xl shrink-0 shadow-inner">
+                                    <CheckCircle2 className="w-8 h-8 font-black" />
+                                </div>
+                                <div className="space-y-1">
+                                    <h4 className="font-extrabold text-lg md:text-xl tracking-tight text-emerald-800 dark:text-emerald-300">
+                                        🎉 Impor Bank Soal Berhasil!
+                                    </h4>
+                                    <p className="text-sm font-medium opacity-90 leading-relaxed">
+                                        Seluruh data soal dari dokumen Anda berhasil diidentifikasi, dimigrasikan, dan disinkronkan ke bank soal CBT.
+                                    </p>
+                                    {importMessage.fileName && (
+                                        <div className="mt-2.5 flex items-center gap-2 text-xs font-mono bg-emerald-500/10 dark:bg-emerald-500/15 py-1 px-3 rounded-lg border border-emerald-500/10 dark:border-emerald-500/20 w-max text-emerald-700 dark:text-emerald-400">
+                                            <span className="font-sans font-semibold text-emerald-800/70 dark:text-emerald-300/60">Sumber:</span>
+                                            {importMessage.fileName}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="flex flex-row md:flex-col items-center justify-between md:justify-center gap-4 bg-emerald-500/10 dark:bg-emerald-500/15 p-4 rounded-2xl border border-emerald-500/20 shrink-0 min-w-[180px] text-center shadow-sm">
+                                <div>
+                                    <div className="text-3xl font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400">
+                                        +{importMessage.count || 0}
+                                    </div>
+                                    <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-800/70 dark:text-emerald-300/70 mt-0.5">
+                                        Soal Ditambahkan
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-1.5 w-full">
+                                    <button
+                                        onClick={() => {
+                                            const element = document.getElementById('search');
+                                            if (element) {
+                                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                            }
+                                        }}
+                                        className="w-full py-1.5 px-3 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow active:scale-[0.98] transition-all cursor-pointer"
+                                    >
+                                        Lihat Daftar Soal
+                                    </button>
+                                    <button
+                                        onClick={() => setImportMessage(null)}
+                                        className="w-full py-1 px-3 text-[11px] font-semibold rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-emerald-800 dark:text-emerald-400 transition-colors cursor-pointer"
+                                    >
+                                        Tutup
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex-1">
-                            <h4 className="font-black text-base md:text-lg mb-1 tracking-tight">
-                                {importMessage.type === 'success' ? 'Berhasil Diimpor!' : 'Proses Impor Gagal'}
-                            </h4>
-                            <p className="text-sm font-medium opacity-90 leading-relaxed">
-                                {importMessage.text}
-                            </p>
+                    ) : (
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                                <div className="p-2 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl shrink-0">
+                                    <AlertCircle className="w-6 h-6" />
+                                </div>
+                                <div className="space-y-1">
+                                    <h4 className="font-bold text-base md:text-lg text-rose-800 dark:text-rose-300 tracking-tight">
+                                        Proses Impor Gagal
+                                    </h4>
+                                    <p className="text-sm font-medium opacity-90 leading-relaxed">
+                                        {importMessage.text}
+                                    </p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setImportMessage(null)}
+                                className="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors shrink-0"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
                         </div>
-                        <button 
-                            onClick={() => setImportMessage(null)}
-                            className="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
+                    )}
                   </motion.div>
                 )}
             </>
