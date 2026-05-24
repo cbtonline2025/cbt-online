@@ -18,6 +18,7 @@ export enum View {
 
 export interface StudentData {
   nisn?: string;
+  username?: string;
   fullName: string;
   class: string; // e.g., 'X-A', 'VII-B'
   school: string;
@@ -70,6 +71,8 @@ export interface Exam {
     phase: 'D' | 'E' | 'F';
     durationMinutes: number;
     questionIds: string[];
+    durationType?: 'per-exam' | 'per-question';
+    durationSecondsPerQuestion?: number;
 }
 
 export interface StudentAnswer {

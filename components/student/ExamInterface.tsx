@@ -22,6 +22,7 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [questionTimeLeft, setQuestionTimeLeft] = useState(0);
 
   const [violationMessage, setViolationMessage] = useState<string | null>(null);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -36,44 +37,9 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
     setTimeout(() => setViolationMessage(null), 5000);
   }, []);
 
-  const { warnings, isDisqualified } = useAntiCheat(handleAntiCheat, 3);
-
-  // Handle disqualification
-  useEffect(() => {
-    if (isDisqualified) {
-      console.error("[ANTI-CHEAT LOG] Siswa didiskualifikasi karena terlalu banyak pelanggaran.");
-      handleSubmit(true, "Diskualifikasi: Terlalu banyak pelanggaran anti-cheat.");
-    }
-  }, [isDisqualified]);
-
   const shuffleArray = <T,>(array: T[]): T[] => {
     return [...array].sort(() => Math.random() - 0.5);
   };
-
-  useEffect(() => {
-    const loadExam = async () => {
-      const data = await fetchExamDetails(examId);
-      if (data) {
-        const shuffledQuestions = shuffleArray(data.questions);
-        setExam(data.exam);
-        setQuestions(shuffledQuestions);
-        setAnswers(shuffledQuestions.map(q => ({ questionId: q.id, answer: '', isDoubtful: false })));
-        setTimeLeft(data.exam.durationMinutes * 60);
-      }
-      setIsLoading(false);
-    };
-    loadExam();
-  }, [examId]);
-
-  useEffect(() => {
-    if (timeLeft > 0 && !isLoading) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && !isLoading && exam) {
-      handleSubmit(true); // Auto-submit when time is up
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, isLoading, exam]);
 
   const handleAnswerChange = (questionId: string, answer: string) => {
     setAnswers(prev => prev.map(a => a.questionId === questionId ? { ...a, answer } : a));
@@ -82,7 +48,7 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
   const toggleDoubtful = (questionId: string) => {
     setAnswers(prev => prev.map(a => a.questionId === questionId ? { ...a, isDoubtful: !a.isDoubtful } : a));
   };
-  
+
   const performSubmission = useCallback(() => {
     if(!exam) return;
 
@@ -118,6 +84,67 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
         setIsSubmitModalOpen(true);
     }
   }, [exam, performSubmission]);
+
+  const { warnings, isDisqualified } = useAntiCheat(handleAntiCheat, 3);
+
+  // Handle disqualification
+  useEffect(() => {
+    if (isDisqualified) {
+      console.error("[ANTI-CHEAT LOG] Siswa didiskualifikasi karena terlalu banyak pelanggaran.");
+      handleSubmit(true, "Diskualifikasi: Terlalu banyak pelanggaran anti-cheat.");
+    }
+  }, [isDisqualified]);
+
+  useEffect(() => {
+    const loadExam = async () => {
+      const data = await fetchExamDetails(examId);
+      if (data) {
+        const shuffledQuestions = shuffleArray(data.questions);
+        setExam(data.exam);
+        setQuestions(shuffledQuestions);
+        setAnswers(shuffledQuestions.map(q => ({ questionId: q.id, answer: '', isDoubtful: false })));
+        setTimeLeft(data.exam.durationMinutes * 60);
+        if (data.exam.durationType === 'per-question') {
+          setQuestionTimeLeft(data.exam.durationSecondsPerQuestion || 60);
+        }
+      }
+      setIsLoading(false);
+    };
+    loadExam();
+  }, [examId]);
+
+  useEffect(() => {
+    if (timeLeft > 0 && !isLoading) {
+      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (timeLeft === 0 && !isLoading && exam) {
+      handleSubmit(true); // Auto-submit when time is up
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, isLoading, exam]);
+
+  useEffect(() => {
+    if (exam && exam.durationType === 'per-question') {
+      setQuestionTimeLeft(exam.durationSecondsPerQuestion || 60);
+    }
+  }, [currentQuestionIndex, exam]);
+
+  useEffect(() => {
+    if (exam && exam.durationType === 'per-question' && !isLoading) {
+      if (questionTimeLeft > 0) {
+        const timer = setTimeout(() => setQuestionTimeLeft(questionTimeLeft - 1), 1000);
+        return () => clearTimeout(timer);
+      } else {
+        if (currentQuestionIndex < questions.length - 1) {
+          alert(`Waktu untuk Soal #${currentQuestionIndex + 1} habis! Otomatis beralih ke soal berikutnya.`);
+          setCurrentQuestionIndex(prev => prev + 1);
+        } else {
+          alert("Waktu pengerjaan soal terakhir habis! Ujian akan diselesaikan secara otomatis.");
+          performSubmission();
+        }
+      }
+    }
+  }, [questionTimeLeft, isLoading, exam, currentQuestionIndex, questions.length, performSubmission]);
 
   if (isLoading) {
     return (
@@ -209,8 +236,25 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
 
         <div className="w-full md:w-96 flex-shrink-0 flex flex-col gap-6">
             <div className="glass-card border-indigo-50 bg-indigo-50/20 p-8 text-center ring-4 ring-white/50">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Sisa Waktu Pengerjaan</p>
-                <div className={`text-4xl font-black tabular-nums tracking-tighter ${timeLeft < 300 ? 'text-rose-500 animate-pulse' : 'text-slate-900'}`}>{formatTime(timeLeft)}</div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
+                    {exam?.durationType === 'per-question' ? 'Sisa Waktu Soal Ini' : 'Sisa Waktu Pengerjaan'}
+                </p>
+                <div className={`text-4xl font-black tabular-nums tracking-tighter ${
+                    (exam?.durationType === 'per-question' ? questionTimeLeft < 10 : timeLeft < 300) 
+                        ? 'text-rose-500 animate-pulse' 
+                        : 'text-slate-900 dark:text-white'
+                }`}>
+                    {exam?.durationType === 'per-question' ? `${questionTimeLeft} dtk` : formatTime(timeLeft)}
+                </div>
+                
+                {exam?.durationType === 'per-question' && (
+                    <div className="h-1.5 w-full bg-slate-200/50 dark:bg-slate-800 rounded-full overflow-hidden mt-3">
+                        <div 
+                          className="h-full bg-indigo-600 transition-all duration-1000" 
+                          style={{ width: `${(questionTimeLeft / (exam.durationSecondsPerQuestion || 60)) * 100}%` }}
+                        ></div>
+                    </div>
+                )}
                 
                 <div className="mt-8 pt-6 border-t border-slate-200/50">
                     <div className="flex items-center justify-between mb-2">

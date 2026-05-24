@@ -1,17 +1,19 @@
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useContext, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
-import { FileText, Video, Music, Edit, Eye, Search, Filter, RefreshCw, Download, CheckCircle2, AlertCircle } from 'lucide-react';
+import { FileText, Video, Music, Edit, Eye, Search, Filter, RefreshCw, Download, CheckCircle2, AlertCircle, HelpCircle, Info, X, Check, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { Question, QuestionType, QuestionOption, QuestionMediaType } from '../../types';
-import { addQuestions, mockQuestions } from '../../services/api';
+import { addQuestions, mockQuestions, deleteQuestion, deleteMultipleQuestions } from '../../services/api';
 import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
 import Input from '../ui/Input';
 import QuestionDetail from './QuestionDetail';
 import EditQuestionModal from './EditQuestionModal';
 import { motion, AnimatePresence } from 'motion/react';
+import { AuthContext } from '../../App';
+
 
 const TabButton: React.FC<{ name: string; activeTab: string; setActiveTab: (name: string) => void; children: React.ReactNode }> = ({ name, activeTab, setActiveTab, children }) => (
     <button
@@ -27,9 +29,25 @@ const TabButton: React.FC<{ name: string; activeTab: string; setActiveTab: (name
 );
 
 const QuestionBank: React.FC = () => {
-    const [activeTab, setActiveTab] = useState('import');
+    const { user } = useContext(AuthContext);
+
+    const assignedSubject = useMemo(() => {
+        if (user && user.role === 'Guru' && user.details?.subject && user.details.subject !== 'Semua Mapel') {
+            return user.details.subject;
+        }
+        return '';
+    }, [user]);
+
+    const [activeTab, setActiveTab ] = useState('import');
     const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
     const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+    const [deletingQuestionId, setDeletingQuestionId] = useState<string | null>(null);
+    const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+    const [isBulkDeletingConfirmOpen, setIsBulkDeletingConfirmOpen] = useState(false);
+
+    // States for Help Guide Modal
+    const [showHelpModal, setShowHelpModal] = useState(false);
+    const [activeHelpTab, setActiveHelpTab] = useState<'word' | 'excel' | 'tips'>('word');
 
     // State for importing
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -45,12 +63,13 @@ const QuestionBank: React.FC = () => {
         mediaUrl: '',
         promptText: '',
         type: QuestionType.MULTIPLE_CHOICE,
-        subject: '',
+        subject: assignedSubject || '',
         phase: 'F' as 'D' | 'E' | 'F',
         options: [{ text: '' }, { text: '' }, { text: '' }, { text: '' }],
         correctAnswerIndex: 0,
         essayAnswer: ''
     });
+
     const [isAdding, setIsAdding] = useState(false);
     const [manualMediaFile, setManualMediaFile] = useState<File | null>(null);
     const manualFileInputRef = useRef<HTMLInputElement>(null);
@@ -58,8 +77,15 @@ const QuestionBank: React.FC = () => {
 
     // State for filtering
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedSubject, setSelectedSubject] = useState('all');
+    const [selectedSubject, setSelectedSubject] = useState(() => assignedSubject || 'all');
     const [selectedPhase, setSelectedPhase] = useState('all');
+
+    useEffect(() => {
+        if (assignedSubject) {
+            setNewQuestion(prev => ({ ...prev, subject: assignedSubject }));
+            setSelectedSubject(assignedSubject);
+        }
+    }, [assignedSubject]);
 
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -506,9 +532,12 @@ const QuestionBank: React.FC = () => {
     };
 
     const uniqueSubjects = useMemo(() => {
+        if (assignedSubject) {
+            return [assignedSubject];
+        }
         const subjects = new Set(questions.map(q => q.subject));
         return ['all', ...Array.from(subjects).sort()];
-    }, [questions]);
+    }, [questions, assignedSubject]);
 
     const subjectCounts = useMemo(() => {
         return questions.reduce((acc, q) => {
@@ -519,18 +548,49 @@ const QuestionBank: React.FC = () => {
 
     const filteredQuestions = useMemo(() => {
         return questions.filter(q => {
+            if (assignedSubject && q.subject.toLowerCase() !== assignedSubject.toLowerCase()) {
+                return false;
+            }
             const contentToSearch = q.mediaType === QuestionMediaType.TEXT ? q.content : q.promptText || '';
             const searchMatch = contentToSearch.toLowerCase().includes(searchQuery.toLowerCase());
             const subjectMatch = selectedSubject === 'all' || q.subject === selectedSubject;
             const phaseMatch = selectedPhase === 'all' || q.phase === selectedPhase;
             return searchMatch && subjectMatch && phaseMatch;
         });
-    }, [questions, searchQuery, selectedSubject, selectedPhase]);
+    }, [questions, searchQuery, selectedSubject, selectedPhase, assignedSubject]);
     
     const handleResetFilters = () => {
         setSearchQuery('');
-        setSelectedSubject('all');
+        setSelectedSubject(assignedSubject || 'all');
         setSelectedPhase('all');
+    };
+
+    const handleDeleteQuestion = async (id: string) => {
+        try {
+            const success = await deleteQuestion(id);
+            if (success) {
+                setQuestions(prev => prev.filter(q => q.id !== id));
+                setSelectedQuestionIds(prev => prev.filter(sid => sid !== id));
+            }
+        } catch (error) {
+            console.error("Gagal menghapus soal", error);
+        } finally {
+            setDeletingQuestionId(null);
+        }
+    };
+    
+    const handleBulkDeleteQuestions = async () => {
+        try {
+            const success = await deleteMultipleQuestions(selectedQuestionIds);
+            if (success) {
+                setQuestions(prev => prev.filter(q => !selectedQuestionIds.includes(q.id)));
+                setSelectedQuestionIds([]);
+            }
+        } catch (error) {
+            console.error("Gagal menghapus soal massal", error);
+        } finally {
+            setIsBulkDeletingConfirmOpen(false);
+        }
     };
     
     const handleExportToCSV = () => {
@@ -633,9 +693,19 @@ const QuestionBank: React.FC = () => {
                         if (!row['type'] || String(row['type']).trim() === '') {
                              throw new Error(`[BARIS ${rowNum}] Tipe soal (kolom 'type') wajib diisi ('Pilihan Ganda' atau 'Esai').`);
                         }
-                        if (!row['subject'] || String(row['subject']).trim() === '') {
-                             throw new Error(`[BARIS ${rowNum}] Mata pelajaran (kolom 'subject') wajib diisi.`);
+
+                        let subjectVal = String(row['subject'] || '').trim();
+                        if (assignedSubject) {
+                            if (subjectVal && subjectVal.toLowerCase() !== assignedSubject.toLowerCase()) {
+                                throw new Error(`[BARIS ${rowNum}] Anda hanya diperbolehkan mengimpor soal untuk mata pelajaran "${assignedSubject}". Berkas Excel berisi "${subjectVal}".`);
+                            }
+                            subjectVal = assignedSubject;
+                        } else {
+                            if (!row['subject'] || String(row['subject']).trim() === '') {
+                                 throw new Error(`[BARIS ${rowNum}] Mata pelajaran (kolom 'subject') wajib diisi.`);
+                            }
                         }
+
                         if (!row['phase'] || String(row['phase']).trim() === '') {
                              throw new Error(`[BARIS ${rowNum}] Fase (kolom 'phase') wajib diisi ('D', 'E', atau 'F').`);
                         }
@@ -664,7 +734,6 @@ const QuestionBank: React.FC = () => {
                         }
 
                         // 3b. Validasi Mata Pelajaran (subject)
-                        const subjectVal = String(row['subject']).trim();
                         if (subjectVal.length < 2) {
                              throw new Error(`[BARIS ${rowNum}] Mata pelajaran (kolom 'subject') harus berupa teks minimal 2 karakter.`);
                         }
@@ -850,11 +919,17 @@ const QuestionBank: React.FC = () => {
                         const explicitPrompt = extractTag(['PROMPT_TEXT', 'PROMPT', 'INSTRUKSI', 'PENGANTAR', 'TEKS_PENGANTAR', 'PERTANYAAN', 'SOAL']);
 
                         // 2. Validasi & Normalisasi Metadata Wajib
-                        if (!subject) {
+                        let finalSubject = subject;
+                        if (assignedSubject) {
+                            if (subject && subject.toLowerCase() !== assignedSubject.toLowerCase()) {
+                                throw new Error(`[SOAL ${questionNum}] Anda hanya diperbolehkan mengimpor soal untuk mata pelajaran "${assignedSubject}". File Word berisi "${subject}".`);
+                            }
+                            finalSubject = assignedSubject;
+                        } else if (!finalSubject) {
                             throw new Error(`[SOAL ${questionNum}] Metadata [SUBJEK] tidak ditemukan. Pastikan ada tag seperti [SUBJEK: Nama Mapel] di dalam soal.`);
                         }
 
-                        if (subject.length < 2) {
+                        if (finalSubject.length < 2) {
                             throw new Error(`[SOAL ${questionNum}] Metadata [SUBJEK] harus berupa teks minimal 2 karakter.`);
                         }
 
@@ -991,7 +1066,7 @@ const QuestionBank: React.FC = () => {
                             mediaType,
                             promptText,
                             correctAnswer, 
-                            subject, 
+                            subject: finalSubject, 
                             phase 
                         } as Question;
                     });
@@ -1044,8 +1119,18 @@ const QuestionBank: React.FC = () => {
                     {activeTab === 'import' && (
                         <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    <div className="bg-white/30 dark:bg-slate-900/50 p-6 rounded-lg">
-                        <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-4">Impor Soal Baru</h3>
+                    <div className="bg-white/30 dark:bg-slate-900/50 p-6 rounded-lg relative overflow-hidden group">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                            <h3 className="text-xl font-semibold text-slate-800 dark:text-white">Impor Soal Baru</h3>
+                            <button 
+                                onClick={() => { setShowHelpModal(true); setActiveHelpTab('word'); }}
+                                type="button" 
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-350 bg-indigo-50/80 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/50 border border-indigo-200/50 dark:border-indigo-900/30 rounded-xl transition-all duration-200 hover:scale-103 shadow-sm hover:shadow active:scale-97 cursor-pointer"
+                            >
+                                <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
+                                <span>Panduan Format</span>
+                            </button>
+                        </div>
                         <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">Unggah file .docx atau .xlsx untuk menambahkan soal secara massal.</p>
                         
                         <input 
@@ -1069,11 +1154,41 @@ const QuestionBank: React.FC = () => {
                                     </button>
                                 </div>
                             ) : (
-                                <div className="text-center">
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Seret & lepas file di sini, atau</p>
-                                    <Button type="button" variant="secondary" onClick={handleSelectFileClick}>
-                                        Pilih File...
-                                    </Button>
+                                <div className="text-center py-2">
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2.5">Seret & lepas file di sini, atau</p>
+                                    <div className="flex items-center justify-center flex-wrap gap-2.5">
+                                        <Button type="button" variant="secondary" onClick={handleSelectFileClick} className="shadow-sm">
+                                            Pilih Berkas...
+                                        </Button>
+                                        
+                                        <div className="relative group/tooltip">
+                                            <button 
+                                                type="button"
+                                                onClick={() => { setShowHelpModal(true); setActiveHelpTab('word'); }}
+                                                className="px-4 py-2.5 text-xs font-bold rounded-lg bg-white hover:bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-750 border border-slate-300/60 dark:border-slate-700 flex items-center gap-1.5 transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+                                            >
+                                                <HelpCircle className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
+                                                <span>Panduan Impor</span>
+                                            </button>
+                                            
+                                            {/* Beautiful Tooltip Content */}
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3.5 bg-slate-900 border border-slate-800 text-white rounded-xl shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 z-30 text-left text-xs pointer-events-none">
+                                                <div className="font-extrabold text-indigo-400 mb-1.5 flex items-center gap-1">
+                                                    <Info className="w-3.5 h-3.5 text-indigo-400" />
+                                                    <span>Petunjuk Cepat Impor</span>
+                                                </div>
+                                                <p className="text-slate-300 leading-relaxed mb-2 font-medium">
+                                                    Mendukung format <strong className="text-white">Word (.docx)</strong> & <strong className="text-white">Excel (.xlsx)</strong> sesuai template resmi.
+                                                </p>
+                                                <div className="text-[10px] text-slate-400 flex flex-col gap-1 border-t border-slate-800 pt-1.5">
+                                                    <div>• Word: Gunakan nomor urut (contoh: 1., 2.) & tag [SUBJEK: ...]</div>
+                                                    <div>• Excel: Gunakan header kolom lower-case dari template</div>
+                                                    <span className="text-indigo-300 font-bold mt-1 inline-block">Klik tombol ini untuk panduan visual interaktif!</span>
+                                                </div>
+                                                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900"></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1209,10 +1324,10 @@ const QuestionBank: React.FC = () => {
                                 </div>
                                 <div className="space-y-1">
                                     <h4 className="font-extrabold text-lg md:text-xl tracking-tight text-emerald-800 dark:text-emerald-300">
-                                        🎉 Impor Bank Soal Berhasil!
+                                        🎉 Impor Berhasil! {importMessage.count || 0} Soal Telah Berhasil Ditambahkan
                                     </h4>
                                     <p className="text-sm font-medium opacity-90 leading-relaxed">
-                                        Seluruh data soal dari dokumen Anda berhasil diidentifikasi, dimigrasikan, dan disinkronkan ke bank soal CBT.
+                                        Sebanyak <strong className="font-black text-emerald-600 dark:text-emerald-400 font-mono text-base">{importMessage.count || 0} butir soal</strong> dari dokumen Anda telah sukses diidentifikasi, diproses, dan dimasukkan ke dalam Bank Soal CBT.
                                     </p>
                                     {importMessage.fileName && (
                                         <div className="mt-2.5 flex items-center gap-2 text-xs font-mono bg-emerald-500/10 dark:bg-emerald-500/15 py-1 px-3 rounded-lg border border-emerald-500/10 dark:border-emerald-500/20 w-max text-emerald-700 dark:text-emerald-400">
@@ -1409,6 +1524,7 @@ const QuestionBank: React.FC = () => {
                                 placeholder="Contoh: Matematika, Fisika, Bahasa Indonesia, atau Seni Budaya..." 
                                 value={newQuestion.subject} 
                                 onChange={(e) => handleNewQuestionChange('subject', e.target.value)} 
+                                disabled={!!assignedSubject}
                             />
                            <div>
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Fase</label>
@@ -1552,10 +1668,52 @@ const QuestionBank: React.FC = () => {
                             </select>
                         </div>
                     </div>
-                     <div className='mt-4 flex justify-end'>
-                         <Button onClick={handleResetFilters} variant="secondary" className='py-2 px-4 text-sm'>Reset Filter</Button>
+                    <div className='mt-4 flex justify-end'>
+                        <Button onClick={handleResetFilters} variant="secondary" className='py-2 px-4 text-sm'>Reset Filter</Button>
                     </div>
                 </div>
+
+                {/* Bulk Select & Delete Action Bar */}
+                {filteredQuestions.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 mb-5 bg-white dark:bg-slate-900/60 rounded-3xl border border-slate-205 border-slate-200/60 dark:border-slate-800 shadow-sm animate-fade-in">
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <label className="flex items-center gap-2.5 cursor-pointer select-none text-xs font-bold text-slate-700 dark:text-slate-300">
+                                <input
+                                    type="checkbox"
+                                    checked={filteredQuestions.length > 0 && filteredQuestions.every(q => selectedQuestionIds.includes(q.id))}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            const filteredIds = filteredQuestions.map(q => q.id);
+                                            setSelectedQuestionIds(prev => Array.from(new Set([...prev, ...filteredIds])));
+                                        } else {
+                                            const filteredIds = filteredQuestions.map(q => q.id);
+                                            setSelectedQuestionIds(prev => prev.filter(id => !filteredIds.includes(id)));
+                                        }
+                                    }}
+                                    className="w-4.5 h-4.5 rounded text-indigo-600 border-slate-300 dark:border-slate-700 focus:ring-indigo-500 cursor-pointer"
+                                />
+                                Pilih Semua ({filteredQuestions.length} Soal Sesuai Filter)
+                            </label>
+                            
+                            {selectedQuestionIds.length > 0 && (
+                                <span className="text-[11px] bg-indigo-50 dark:bg-indigo-950/55 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full font-black border border-indigo-150/30 dark:border-indigo-900/30">
+                                    {selectedQuestionIds.length} Terpilih
+                                </span>
+                            )}
+                        </div>
+
+                        {selectedQuestionIds.length > 0 && (
+                            <Button
+                                type="button"
+                                onClick={() => setIsBulkDeletingConfirmOpen(true)}
+                                className="w-full sm:w-auto py-2 px-4 text-xs font-black bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-500/10 active:scale-[0.98] flex items-center justify-center gap-1.5 rounded-xl transition-all cursor-pointer border border-rose-500/20"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Hapus {selectedQuestionIds.length} Soal Terpilih
+                            </Button>
+                        )}
+                    </div>
+                )}
 
                 <div className="max-h-[600px] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/30 p-6 rounded-[2rem] border border-slate-200/60 dark:border-slate-800/50 shadow-inner custom-scrollbar">
                     {filteredQuestions.length > 0 ? (
@@ -1575,9 +1733,24 @@ const QuestionBank: React.FC = () => {
                                             transition={{ duration: 0.3, delay: revIndex * 0.05 }}
                                             className="group flex items-stretch bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-[1.5rem] border border-slate-200/60 dark:border-slate-700/50 hover:border-indigo-500/50 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05),0_10px_25px_-5px_rgba(0,0,0,0.03)] dark:shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)] hover:shadow-2xl hover:shadow-indigo-500/20 dark:hover:shadow-indigo-500/20 hover:-translate-y-1.5 transition-all duration-500 overflow-hidden"
                                         >
+                                            {/* Selection Checkbox */}
+                                            <div className="flex items-center pl-5 pr-1 select-none">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedQuestionIds.includes(q.id)}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        setSelectedQuestionIds(prev => 
+                                                            checked ? [...prev, q.id] : prev.filter(id => id !== q.id)
+                                                        );
+                                                    }}
+                                                    className="w-4.5 h-4.5 rounded text-indigo-600 border-slate-300 dark:border-slate-700 focus:ring-indigo-500 cursor-pointer transition-colors"
+                                                />
+                                            </div>
+
                                             <button 
                                                 onClick={() => setSelectedQuestionId(q.id)}
-                                                className="flex-grow text-left p-5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                                                className="flex-grow text-left p-5 pl-3 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
                                                 title="Klik untuk melihat detail soal"
                                             >
                                                 <div className="flex flex-wrap items-center gap-3 mb-3">
@@ -1623,20 +1796,30 @@ const QuestionBank: React.FC = () => {
                                                 </div>
                                             </button>
                                             
-                                            <div className="flex flex-col border-l border-slate-100 dark:border-slate-700/50">
+                                            <div className="flex flex-col border-l border-slate-100 dark:border-slate-700/50 min-w-[3.5rem]">
                                                 <button 
+                                                    type="button"
                                                     onClick={(e) => { e.stopPropagation(); setEditingQuestionId(q.id); }}
-                                                    className="flex-grow p-5 flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all border-b border-slate-100 dark:border-slate-700/50"
+                                                    className="flex-grow p-3.5 flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all border-b border-slate-100 dark:border-slate-700/50"
                                                     title="Edit Soal"
                                                 >
-                                                    <Edit className="h-5 w-5" />
+                                                    <Edit className="h-4.5 w-4.5" />
                                                 </button>
                                                 <button 
+                                                    type="button"
                                                     onClick={(e) => { e.stopPropagation(); setSelectedQuestionId(q.id); }}
-                                                    className="flex-grow p-5 flex items-center justify-center text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all"
+                                                    className="flex-grow p-3.5 flex items-center justify-center text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all border-b border-slate-100 dark:border-slate-700/50"
                                                     title="Lihat Detail"
                                                 >
-                                                    <Eye className="h-5 w-5" />
+                                                    <Eye className="h-4.5 w-4.5" />
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); setDeletingQuestionId(q.id); }}
+                                                    className="flex-grow p-3.5 flex items-center justify-center text-slate-400 hover:text-rose-650 dark:hover:text-rose-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all"
+                                                    title="Hapus Soal"
+                                                >
+                                                    <Trash2 className="h-4.5 w-4.5" />
                                                 </button>
                                             </div>
                                         </motion.div>
@@ -1661,7 +1844,419 @@ const QuestionBank: React.FC = () => {
         </motion.div>
     )}
 </AnimatePresence>
-</div>
+
+            {/* HELPER GUIDE MODAL */}
+            <AnimatePresence>
+                {showHelpModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 md:p-6"
+                        onClick={() => setShowHelpModal(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 20, opacity: 0 }}
+                            animate={{ scale: 1, y: 0, opacity: 1 }}
+                            exit={{ scale: 0.95, y: 20, opacity: 0 }}
+                            transition={{ type: "spring", duration: 0.35 }}
+                            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden text-slate-800 dark:text-slate-100"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Modal Header */}
+                            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/20">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-950/50 rounded-xl flex items-center justify-center border border-indigo-100 dark:border-indigo-900/40">
+                                        <HelpCircle className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                    </div>
+                                    <div className="text-left">
+                                        <h3 className="text-lg font-black tracking-tight text-slate-900 dark:text-white">Panduan Format Impor Bank Soal</h3>
+                                        <p className="text-xs text-slate-400 dark:text-slate-500 font-medium whitespace-normal">Ikuti panduan berikut agar berkas soal langsung terbaca sempurna oleh sistem</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowHelpModal(false)}
+                                    className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Modal Sub-Tabs */}
+                            <div className="flex bg-slate-100/60 dark:bg-slate-950/40 p-1 border-b border-slate-100/60 dark:border-slate-850 px-6">
+                                <button
+                                    onClick={() => setActiveHelpTab('word')}
+                                    className={`flex items-center gap-2 py-3 px-4 text-xs font-bold rounded-xl transition-all border-b-2 border-transparent ${
+                                        activeHelpTab === 'word'
+                                            ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+                                    }`}
+                                >
+                                    <FileText className="w-4 h-4 text-indigo-500" />
+                                    <span>Format Word (.docx)</span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveHelpTab('excel')}
+                                    className={`flex items-center gap-2 py-3 px-4 text-xs font-bold rounded-xl transition-all border-b-2 border-transparent ${
+                                        activeHelpTab === 'excel'
+                                            ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+                                    }`}
+                                >
+                                    <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+                                    <span>Format Excel (.xlsx)</span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveHelpTab('tips')}
+                                    className={`flex items-center gap-2 py-3 px-4 text-xs font-bold rounded-xl transition-all border-b-2 border-transparent ${
+                                        activeHelpTab === 'tips'
+                                            ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+                                    }`}
+                                >
+                                    <Info className="w-4 h-4 text-amber-500" />
+                                    <span>Tips & Validasi Soal</span>
+                                </button>
+                            </div>
+
+                            {/* Modal Body (Scrollable) */}
+                            <div className="p-6 overflow-y-auto space-y-6 flex-grow custom-scrollbar text-left">
+                                {activeHelpTab === 'word' && (
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                        <div className="bg-indigo-50/40 dark:bg-indigo-950/10 p-4 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/30 text-indigo-900 dark:text-indigo-200 text-xs leading-relaxed">
+                                            <p className="font-extrabold text-indigo-700 dark:text-indigo-400 mb-1">💡 Penggunaan Cepat:</p>
+                                            Penyusunan format Word sangat fleksibel, mirip dengan membuat lembar ujian biasa. Pastikan untuk menuliskan butir pertanyaan secara urut menggunakan penomoran standar.
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {/* Contoh Layout */}
+                                            <div className="space-y-2">
+                                                <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Struktur Teks Dokumen Word</h4>
+                                                <div className="bg-slate-50 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-150 dark:border-slate-850 font-mono text-[10px] leading-relaxed select-all">
+                                                    <div>1. Apa singkatan dari CBT dalam ujian daring?<br/>
+                                                    <span className="text-indigo-500">[SUBJEK: Informatika]</span><br/>
+                                                    <span className="text-indigo-500">[FASE: F]</span><br/>
+                                                    A. Computer Based Test<br/>
+                                                    B. Central Business Tool<br/>
+                                                    C. Common Basic Technology<br/>
+                                                    KUNCI: A</div>
+                                                    
+                                                    <div className="mt-4 pt-3 border-t border-dashed border-slate-200 dark:border-slate-800">
+                                                        2. Perhatikan video pembelajaran tentang mekanika Newton berikut. Mengapa apel jatuh ke bumi?<br/>
+                                                        <span className="text-indigo-500">[SUBJEK: Fisika]</span><br/>
+                                                        <span className="text-indigo-500">[FASE: F]</span><br/>
+                                                        <span className="text-indigo-500">[MEDIA: Video]</span><br/>
+                                                        <span className="text-indigo-500">[URL: https://www.youtube.com/watch?v=VBhIOp]</span><br/>
+                                                        A. Karena adanya gaya gravitasi bumi<br/>
+                                                        B. Karena magnet bumi sangat kuat<br/>
+                                                        KUNCI: A
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Aturan Main */}
+                                            <div className="space-y-4">
+                                                <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Aturan Wajib Microsoft Word</h4>
+                                                <ul className="space-y-3 text-xs">
+                                                    <li className="flex items-start gap-2.5">
+                                                        <div className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5"><Check className="w-3 h-3" /></div>
+                                                        <div>
+                                                            <strong className="text-slate-900 dark:text-white font-bold">Penomoran Soal:</strong> Setiap butir soal harus menggunakan nomor diikuti titik (<code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px]">1.</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px]">2.</code>, dst) di awal baris pertanyaan.
+                                                        </div>
+                                                    </li>
+                                                    <li className="flex items-start gap-2.5">
+                                                        <div className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5"><Check className="w-3 h-3" /></div>
+                                                        <div>
+                                                            <strong className="text-slate-900 dark:text-white font-bold">Opsi Pilihan:</strong> Opsi wajib diletakkan di baris baru dengan struktur abjad (<code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px]">A.</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px]">B.</code>, dst).
+                                                        </div>
+                                                    </li>
+                                                    <li className="flex items-start gap-2.5">
+                                                        <div className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5"><Check className="w-3 h-3" /></div>
+                                                        <div>
+                                                            <strong className="text-slate-900 dark:text-white font-bold">Metadata Tag:</strong> Tag subjek, fase, dan multimedia opsional diletakkan di dalam tanda kurung siku seperti <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">[SUBJEK: ...]</code> di bawah pertanyaan atau baris baru.
+                                                        </div>
+                                                    </li>
+                                                    <li className="flex items-start gap-2.5">
+                                                        <div className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5"><Check className="w-3 h-3" /></div>
+                                                        <div>
+                                                            <strong className="text-slate-900 dark:text-white font-bold">Jawaban Kunci:</strong> Tuliskan kunci jawaban menggunakan penanda <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">KUNCI: A</code> pada baris setelah pilihan jawaban selesai.
+                                                        </div>
+                                                    </li>
+                                                </ul>
+
+                                                <button 
+                                                    onClick={handleDownloadWordTemplate}
+                                                    type="button"
+                                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 cursor-pointer"
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                    <span>Unduh Template Word (.docx)</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeHelpTab === 'excel' && (
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                        <div className="bg-emerald-50/40 dark:bg-emerald-950/10 p-4 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/30 text-emerald-900 dark:text-emerald-200 text-xs leading-relaxed">
+                                            <p className="font-extrabold text-emerald-700 dark:text-emerald-400 mb-1">📘 Struktur Kolom Spreadsheet:</p>
+                                            Metode impor Excel sangat cocok untuk bank soal besar. Kolom-kolom di baris pertama (header) harus ditulis persis menggunakan huruf kecil agar sistem dapat melakukan pencocokan database secara dinamis.
+                                        </div>
+
+                                        <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl">
+                                            <table className="w-full text-left text-xs border-collapse">
+                                                <thead>
+                                                    <tr className="bg-slate-50 dark:bg-slate-950/40 border-b border-slate-200 dark:border-slate-800 font-bold text-slate-500 dark:text-slate-400">
+                                                        <th className="p-3">Nama Kolom <span className="text-rose-500">*</span></th>
+                                                        <th className="p-3">Tipe/Format</th>
+                                                        <th className="p-3">Keterangan & Contoh</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-medium">
+                                                    <tr>
+                                                        <td className="p-3 font-mono text-indigo-600 dark:text-indigo-400 font-bold">content</td>
+                                                        <td className="p-3 text-[11px] text-slate-400">Teks Bebas</td>
+                                                        <td className="p-3 text-slate-600 dark:text-slate-350">Teks isi butir pertanyaan (contoh: "Hasil dari 5 + 3 adalah...")</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 font-mono text-indigo-600 dark:text-indigo-400 font-bold">type</td>
+                                                        <td className="p-3 text-[11px] text-slate-400">Pilihan atau Teks</td>
+                                                        <td className="p-3 text-slate-600 dark:text-slate-350">Isi dengan <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.2 rounded text-[10px]">Pilihan Ganda</code> atau <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.2 rounded text-[10px]">Esai</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 font-mono text-indigo-600 dark:text-indigo-400 font-bold">subject</td>
+                                                        <td className="p-3 text-[11px] text-slate-400">Nama Mapel</td>
+                                                        <td className="p-3 text-slate-600 dark:text-slate-350">Mata pelajaran. Contoh: <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.2 rounded text-[10px]">Matematika</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 font-mono text-indigo-600 dark:text-indigo-400 font-bold">phase</td>
+                                                        <td className="p-3 text-[11px] text-slate-400 font-sans">Satu Huruf</td>
+                                                        <td className="p-3 text-slate-600 dark:text-slate-350">Harus berupa salah satu: <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.2 rounded text-[10px]">D</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.2 rounded text-[10px]">E</code>, atau <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.2 rounded text-[10px]">F</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 font-mono text-indigo-600 dark:text-indigo-400 font-bold">optionA-E</td>
+                                                        <td className="p-3 text-[11px] text-slate-400 font-sans">Opsi Pilihan</td>
+                                                        <td className="p-3 text-slate-600 dark:text-slate-350 font-sans">Pisahkan opsi di masing-masing kolom (<code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-[10px]">optionA</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-[10px]">optionB</code>, dst)</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 font-mono text-indigo-600 dark:text-indigo-400 font-bold font-sans">correctAnswer</td>
+                                                        <td className="p-3 text-[11px] text-slate-400 font-sans">Index atau Huruf</td>
+                                                        <td className="p-3 text-slate-600 dark:text-slate-350 font-sans font-sans">Tuliskan index angka (<code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-[10px]">0</code> untuk A, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-[10px]">1</code> untuk B, dst) atau teks opsi yang benar.</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 font-mono text-indigo-500">mediaType</td>
+                                                        <td className="p-3 text-[11px] text-slate-400 font-sans">Pilihan</td>
+                                                        <td className="p-3 text-slate-600 dark:text-slate-350 font-sans">Isi dengan <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-[10px]">Teks</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-[10px]">Gambar</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-[10px]">Audio</code>, atau <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-[10px]">Video</code> jika ada stimulus.</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 font-mono text-indigo-500">mediaUrl</td>
+                                                        <td className="p-3 text-[11px] text-slate-400 font-sans">URL Link</td>
+                                                        <td className="p-3 text-slate-600 dark:text-slate-350 font-sans">Tautan multimedia penunjang soal (misalnya link YouTube atau Drive)</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <button 
+                                            onClick={handleDownloadExcelTemplate}
+                                            type="button"
+                                            className="w-full flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 cursor-pointer"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            <span>Unduh Template Excel (.xlsx)</span>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {activeHelpTab === 'tips' && (
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200 text-xs leading-relaxed">
+                                        <div className="bg-amber-50/40 dark:bg-amber-950/15 p-4 rounded-2xl border border-amber-100/50 dark:border-amber-900/30 text-amber-900 dark:text-amber-200 font-medium">
+                                            <p className="font-extrabold text-amber-700 dark:text-amber-450 mb-1 flex items-center gap-1.5">
+                                                <AlertCircle className="w-4 h-4" />
+                                                Petunjuk Penting Menolak Kegagalan Unggah:
+                                            </p>
+                                            Sebelum mengunggah, bacalah rangkuman validasi di bawah ini untuk mengantisipasi kesalahan analisis parser otomatis.
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {/* Tips Do's */}
+                                            <div className="space-y-3 bg-indigo-50/25 dark:bg-indigo-950/5 p-5 rounded-2xl border border-indigo-100/30 dark:border-indigo-900/10">
+                                                <h4 className="font-extrabold text-indigo-700 dark:text-indigo-400 flex items-center gap-2 font-sans"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Praktik Terbaik (Do)</h4>
+                                                <ul className="space-y-2.5 text-slate-600 dark:text-slate-300">
+                                                    <li className="flex items-start gap-1.5">
+                                                        <span className="text-emerald-500 font-bold">•</span>
+                                                        <span>Pastikan subject dan fase tertulis jelas agar mapel tidak kosong.</span>
+                                                    </li>
+                                                    <li className="flex items-start gap-1.5">
+                                                        <span className="text-emerald-500 font-bold">•</span>
+                                                        <span>Simpan file dokumen dalam folder yang mudah diakses dan jangan ganti tipenya menjadi manual.</span>
+                                                    </li>
+                                                    <li className="flex items-start gap-1.5">
+                                                        <span className="text-emerald-500 font-bold">•</span>
+                                                        <span>Gunakan link YouTube publik yang valid untuk format multimedia stimulus Video.</span>
+                                                    </li>
+                                                    <li className="flex items-start gap-1.5">
+                                                        <span className="text-emerald-500 font-bold">•</span>
+                                                        <span>Untuk Esai, kosongkan bagian opsi pilihan pada file Excel dan tentukan Kunci dengan teks penjelasan jawaban.</span>
+                                                    </li>
+                                                </ul>
+                                            </div>
+
+                                            {/* Errors Don'ts */}
+                                            <div className="space-y-3 bg-rose-50/25 dark:bg-rose-950/5 p-5 rounded-2xl border border-rose-100/30 dark:border-rose-900/10">
+                                                <h4 className="font-extrabold text-rose-700 dark:text-rose-450 flex items-center gap-2"><AlertCircle className="w-4 h-4 text-rose-500" /> Hindari Kesalahan (Don't)</h4>
+                                                <ul className="space-y-2.5 text-slate-600 dark:text-slate-300">
+                                                    <li className="flex items-start gap-1.5">
+                                                        <span className="text-rose-500 font-bold">•</span>
+                                                        <span>Jangan gunakan format tabel kompleks di dalam lembar Word (.docx). Buatlah teks paragraf polos yang bersih.</span>
+                                                    </li>
+                                                    <li className="flex items-start gap-1.5">
+                                                        <span className="text-rose-500 font-bold">•</span>
+                                                        <span>Jangan menambahkan simbol lain di depan nomor pertanyaan seperti lingkaran bullet atau strip.</span>
+                                                    </li>
+                                                    <li className="flex items-start gap-1.5">
+                                                        <span className="text-rose-500 font-bold">•</span>
+                                                        <span>Jangan merubah nama header kolom Excel menjadi huruf besar/kapital (e.g. jgn ganti <code className="bg-slate-100 dark:bg-slate-800 text-rose-500 rounded px-1 font-mono">content</code>).</span>
+                                                    </li>
+                                                    <li className="flex items-start gap-1.5">
+                                                        <span className="text-rose-500 font-bold">•</span>
+                                                        <span>Jangan menutup tanda kurung tag metadata seperti <code className="bg-slate-100 dark:bg-slate-800 rounded px-1 font-mono">[SUBJEK: Fisika]</code> dengan tanda kurung biasa.</span>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 flex justify-end">
+                                <button
+                                    onClick={() => setShowHelpModal(false)}
+                                    type="button"
+                                    className="px-5 py-2.5 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all shadow cursor-pointer"
+                                >
+                                    Saya Mengerti, Tutup Panduan
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Delete Confirmation Modal */}
+            <AnimatePresence>
+                {deletingQuestionId && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 15 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 15 }}
+                            transition={{ type: "spring", duration: 0.4 }}
+                            className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-250/80 dark:border-slate-800 shadow-2xl max-w-md w-full overflow-hidden"
+                        >
+                            <div className="p-6">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/30 flex items-center justify-center text-rose-500 flex-shrink-0 animate-pulse">
+                                        <AlertCircle className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                                            Konfirmasi Hapus Soal
+                                        </h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            Tindakan ini tidak dapat dibatalkan
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/60">
+                                    Apakah Anda yakin ingin menghapus soal ini dari bank soal? Soal ini akan dihapus secara permanen dari sistem.
+                                </p>
+                                
+                                <div className="flex items-center justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDeletingQuestionId(null)}
+                                        className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                                    >
+                                        Batal
+                                    </button>
+                                    <Button
+                                        onClick={() => handleDeleteQuestion(deletingQuestionId)}
+                                        className="py-2.5 px-5 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-500/20 active:scale-[0.98]"
+                                    >
+                                        Ya, Hapus
+                                    </Button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Bulk Delete Confirmation Modal */}
+            <AnimatePresence>
+                {isBulkDeletingConfirmOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 15 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 15 }}
+                            transition={{ type: "spring", duration: 0.4 }}
+                            className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-250/80 dark:border-slate-800 shadow-2xl max-w-md w-full overflow-hidden"
+                        >
+                            <div className="p-6">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/30 flex items-center justify-center text-rose-500 flex-shrink-0 animate-pulse">
+                                        <AlertCircle className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                                            Konfirmasi Hapus Massal
+                                        </h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            Menghapus {selectedQuestionIds.length} soal sekaligus
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/60">
+                                    Apakah Anda yakin ingin menghapus <span className="font-bold text-rose-600 dark:text-rose-450">{selectedQuestionIds.length} soal</span> terpilih dari bank soal secara massal? Tindakan ini akan menghapus semua soal terpilih secara permanen dari sistem dan tidak dapat dibatalkan.
+                                </p>
+                                
+                                <div className="flex items-center justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsBulkDeletingConfirmOpen(false)}
+                                        className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                                    >
+                                        Batal
+                                    </button>
+                                    <Button
+                                        onClick={handleBulkDeleteQuestions}
+                                        className="py-2.5 px-5 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-500/20 active:scale-[0.98]"
+                                    >
+                                        Ya, Hapus Semua ({selectedQuestionIds.length})
+                                    </Button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
     );
 };
 

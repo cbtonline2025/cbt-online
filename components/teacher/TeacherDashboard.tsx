@@ -5,10 +5,12 @@ import ResultsAnalysis from './ResultsAnalysis';
 import Button from '../ui/Button';
 import QuestionBank from './QuestionBank';
 import DeploymentGuide from './DeploymentGuide';
-import { Database, PlusCircle, BarChart3, ChevronLeft, LogOut, ArrowRight, BookOpen, Settings, HelpCircle } from 'lucide-react';
+import StudentManager from '../shared/StudentManager';
+import { Database, PlusCircle, BarChart3, ChevronLeft, LogOut, ArrowRight, BookOpen, Settings, HelpCircle, Users, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
+import ExamSettings from './ExamSettings';
 
-type TeacherView = 'dashboard' | 'question_bank' | 'exam_creator' | 'results' | 'guide';
+type TeacherView = 'dashboard' | 'question_bank' | 'exam_creator' | 'results' | 'guide' | 'students' | 'exam_settings';
 
 const DashboardCard: React.FC<{ 
     title: string; 
@@ -104,6 +106,10 @@ const TeacherDashboard: React.FC<{ user: User, logout: () => void }> = ({ user, 
             return <QuestionBank />;
         case 'guide':
             return <DeploymentGuide />;
+        case 'students':
+            return <StudentManager />;
+        case 'exam_settings':
+            return <ExamSettings />;
         case 'dashboard':
         default:
             return (
@@ -141,18 +147,18 @@ const TeacherDashboard: React.FC<{ user: User, logout: () => void }> = ({ user, 
                             icon={<HelpCircle className="h-7 w-7" />}
                         />
                         <DashboardCard
-                            title="Konfigurasi Ujian"
-                            description="Rancang jadwal ujian, durasi, dan tentukan peserta ujian dalam satu langkah."
-                            onClick={() => alert('Fitur Konfigurasi Ujian segera hadir!')}
+                            title="Manajemen & Impor Siswa"
+                            description="Registrasi siswa massal dari Excel atau buat secara mandiri lengkap dengan PIN sandi masuk."
+                            onClick={() => setView('students')}
                             color="amber"
-                            icon={<PlusCircle className="h-7 w-7" />}
+                            icon={<Users className="h-7 w-7" />}
                         />
                         <DashboardCard
-                            title="Materi Pembelajaran"
-                            description="Unggah dan kelola modul pembelajaran sebagai referensi belajar mandiri siswa."
-                            onClick={() => alert('Fitur Materi segera hadir!')}
+                            title="Durasi & Sesi Ujian"
+                            description="Atur durasi ujian (jenis per-soal atau per-ujian secara keseluruhan) serta durasi pengerjaan."
+                            onClick={() => setView('exam_settings')}
                             color="violet"
-                            icon={<BookOpen className="h-7 w-7" />}
+                            icon={<Clock className="h-7 w-7" />}
                         />
                         <DashboardCard
                             title="Pengaturan Sistem"

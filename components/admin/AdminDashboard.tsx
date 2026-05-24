@@ -4,6 +4,7 @@ import Button from '../ui/Button';
 import { Users, Monitor, Settings, LogOut, ChevronLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import ExamMonitoring from './ExamMonitoring';
+import StudentManager from '../shared/StudentManager';
 
 const DashboardCard: React.FC<{ 
     title: string; 
@@ -69,7 +70,7 @@ const DashboardCard: React.FC<{
 
 
 const AdminDashboard: React.FC<{ user: User, logout: () => void }> = ({ user, logout }) => {
-  const [view, setView] = useState<'dashboard' | 'monitoring'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'monitoring' | 'students'>('dashboard');
 
   return (
     <motion.div 
@@ -124,7 +125,7 @@ const AdminDashboard: React.FC<{ user: User, logout: () => void }> = ({ user, lo
                 <DashboardCard
                     title="Manajemen Pengguna"
                     description="Kelola akun siswa, guru, dan hak akses proktor lainnya dengan mudah."
-                    onClick={() => alert('Fitur Manajemen Pengguna segera hadir!')}
+                    onClick={() => setView('students')}
                     color="indigo"
                     icon={<Users className="h-6 w-6" />}
                 />
@@ -142,6 +143,10 @@ const AdminDashboard: React.FC<{ user: User, logout: () => void }> = ({ user, lo
                     color="amber"
                     icon={<Settings className="h-6 w-6" />}
                 />
+            </div>
+        ) : view === 'students' ? (
+            <div className="animate-fade-in relative">
+                <StudentManager />
             </div>
         ) : (
             <div className="animate-fade-in relative">

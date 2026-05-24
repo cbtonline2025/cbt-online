@@ -15,7 +15,17 @@ const Login: React.FC<LoginProps> = ({ onRegisterClick }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<Role>(Role.STUDENT);
+  const [clickCount, setClickCount] = useState(0);
+  const [showDemo, setShowDemo] = useState(false);
   const { login } = useContext(AuthContext);
+
+  const handleFingerprintClick = () => {
+    const nextCount = clickCount + 1;
+    if (nextCount >= 3) {
+      setShowDemo(true);
+    }
+    setClickCount(nextCount);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +66,9 @@ const Login: React.FC<LoginProps> = ({ onRegisterClick }) => {
               initial={{ rotate: -20, opacity: 0 }}
               animate={{ rotate: 0, opacity: 1 }}
               transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
+              onClick={handleFingerprintClick}
+              className="cursor-pointer active:scale-95 transition-transform"
+              title="Sistem Terverifikasi"
             >
               <Fingerprint className="w-8 h-8 md:w-12 md:h-12 text-fuchsia-500 animate-pulse" />
             </motion.div>
@@ -135,40 +148,42 @@ const Login: React.FC<LoginProps> = ({ onRegisterClick }) => {
         </button>
       </p>
 
-      {/* Quick Access Info Section */}
-      <div className="mt-12 pt-8 border-t border-dashed border-slate-100 dark:border-slate-800/50">
-        <div className="flex items-center gap-2 mb-5 px-1">
-          <div className="h-0.5 w-6 bg-indigo-400 dark:bg-indigo-600 rounded-full"></div>
-          <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Akun Demo</p>
-        </div>
-        <div className="grid grid-cols-1 gap-3">
-            {[
-              { r: Role.STUDENT, u: '0012345678', icon: <User className="w-3 h-3" />, color: 'bg-blue-500/10 text-blue-500' },
-              { r: Role.TEACHER, u: 'guru_ipa', icon: <GraduationCap className="w-3 h-3" />, color: 'bg-indigo-500/10 text-indigo-500' },
-              { r: Role.ADMIN, u: 'proktor_utama', icon: <ShieldCheck className="w-3 h-3" />, color: 'bg-amber-500/10 text-amber-500' }
-            ].map((item) => (
-              <motion.div 
-                whileHover={{ x: 5 }}
-                key={item.r} 
-                className="flex justify-between items-center px-5 py-4 text-[10px] bg-white/30 dark:bg-slate-900/40 border border-white/50 dark:border-white/5 rounded-3xl group hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer shadow-sm hover:shadow-md"
-                title={`Klik untuk menyalin username`}
-                onClick={() => setUsername(item.u)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-1.5 rounded-lg ${item.color}`}>
-                    {item.icon}
+      {/* Quick Access Info Section hidden from public candidates */}
+      {showDemo && (
+        <div className="mt-12 pt-8 border-t border-dashed border-slate-100 dark:border-slate-800/50">
+          <div className="flex items-center gap-2 mb-5 px-1">
+            <div className="h-0.5 w-6 bg-indigo-400 dark:bg-indigo-600 rounded-full"></div>
+            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Akun Demo</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+              {[
+                { r: Role.STUDENT, u: '0012345678', icon: <User className="w-3 h-3" />, color: 'bg-blue-500/10 text-blue-500' },
+                { r: Role.TEACHER, u: 'guru_ipa', icon: <GraduationCap className="w-3 h-3" />, color: 'bg-indigo-500/10 text-indigo-500' },
+                { r: Role.ADMIN, u: 'proktor_utama', icon: <ShieldCheck className="w-3 h-3" />, color: 'bg-amber-500/10 text-amber-500' }
+              ].map((item) => (
+                <motion.div 
+                  whileHover={{ x: 5 }}
+                  key={item.r} 
+                  className="flex justify-between items-center px-5 py-4 text-[10px] bg-white/30 dark:bg-slate-900/40 border border-white/50 dark:border-white/5 rounded-3xl group hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                  title={`Klik untuk menyalin username`}
+                  onClick={() => setUsername(item.u)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-1.5 rounded-lg ${item.color}`}>
+                      {item.icon}
+                    </div>
+                    <span className="font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">{item.r}</span>
                   </div>
-                  <span className="font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">{item.r}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-indigo-500 dark:text-indigo-400 font-black bg-indigo-50/50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-xl border border-indigo-100/50 dark:border-indigo-900/30 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all duration-300">
-                    {item.u}
-                  </span>
-                </div>
-              </motion.div>
-            ))}
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-indigo-500 dark:text-indigo-400 font-black bg-indigo-50/50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-xl border border-indigo-100/50 dark:border-indigo-900/30 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all duration-300">
+                      {item.u}
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+          </div>
         </div>
-      </div>
+      )}
     </motion.div>
   );
 };

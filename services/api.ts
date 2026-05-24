@@ -233,13 +233,80 @@ export let mockNISNData: { [key: string]: StudentData } = loadData(NISN_STORAGE_
 export let mockQuestions: Question[] = loadData(QUESTIONS_STORAGE_KEY, initialQuestions);
 
 // --- Data Persistence Functions ---
-const saveUsers = () => {
+export const saveUsers = () => {
     try {
         localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(mockUsers));
         localStorage.setItem(NISN_STORAGE_KEY, JSON.stringify(mockNISNData));
     } catch (error) {
         console.error("Error saving user data to localStorage", error);
     }
+};
+
+export const deleteStudentUser = (username: string): boolean => {
+    const initialLength = mockUsers.length;
+    mockUsers = mockUsers.filter(u => !(u.username === username && u.role === Role.STUDENT));
+    if (mockNISNData[username]) {
+        delete mockNISNData[username];
+    }
+    const wasDeleted = mockUsers.length < initialLength;
+    if (wasDeleted) {
+        saveUsers();
+    }
+    return wasDeleted;
+};
+
+export const addBulkStudents = (students: StudentData[]): { successCount: number, errorCount: number, duplicates: string[] } => {
+    let successCount = 0;
+    let errorCount = 0;
+    const duplicates: string[] = [];
+
+    students.forEach(student => {
+        const username = student.username || student.nisn;
+        if (!username || !student.fullName) {
+            errorCount++;
+            return;
+        }
+
+        // Check if student already exists
+        const exists = mockUsers.some(u => u.username.toLowerCase() === username.toLowerCase() && u.role === Role.STUDENT);
+        if (exists) {
+            duplicates.push(username);
+            return;
+        }
+
+        const cleanUsername = username.trim();
+        const pin = student.password || Math.floor(100000 + Math.random() * 900000).toString();
+
+        const studentDetails: StudentData = {
+            nisn: student.nisn || cleanUsername,
+            username: cleanUsername,
+            fullName: student.fullName.trim(),
+            class: student.class || 'Umum',
+            school: student.school || 'SMA Negeri 1 Jakarta',
+            city: student.city || 'Jakarta',
+            province: student.province || 'DKI Jakarta',
+            password: pin,
+        };
+
+        const newUser: User = {
+            id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            username: cleanUsername,
+            fullName: studentDetails.fullName,
+            role: Role.STUDENT,
+            password: pin,
+            details: studentDetails
+        };
+
+        mockUsers.push(newUser);
+        mockNISNData[studentDetails.nisn] = studentDetails;
+        successCount++;
+    });
+
+    if (successCount > 0) {
+        saveUsers();
+    }
+
+    return { successCount, errorCount, duplicates };
 };
 
 const saveQuestions = () => {
@@ -263,12 +330,65 @@ if (__updated) {
 }
 
 
-export const mockExams: Exam[] = [
-    { id: 'exam-fisika-1', title: 'Ujian Akhir Semester Fisika', subject: 'Fisika', phase: 'F', durationMinutes: 90, questionIds: ['q1', 'q2', 'q3', 'q10', 'q17'] },
-    { id: 'exam-ipa-1', title: 'Latihan ANBK IPA', subject: 'IPA', phase: 'D', durationMinutes: 60, questionIds: ['q4', 'q5', 'q6', 'q7', 'q9', 'q18'] },
-    { id: 'exam-bing-1', title: 'Listening Comprehension', subject: 'Bahasa Inggris', phase: 'F', durationMinutes: 45, questionIds: ['q8', 'q11', 'q16'] },
-    { id: 'exam-multimedia-1', title: 'Simulasi Ujian Multimedia (AKM)', subject: 'Seni dan Seni Suara', phase: 'F', durationMinutes: 30, questionIds: ['q16', 'q17', 'q18', 'q15'] }
+const EXAMS_STORAGE_KEY = 'cbt-merdeka-exams';
+
+const initialExams: Exam[] = [
+    { id: 'exam-fisika-1', title: 'Ujian Akhir Semester Fisika', subject: 'Fisika', phase: 'F', durationMinutes: 90, questionIds: ['q1', 'q2', 'q3', 'q10', 'q17'], durationType: 'per-exam', durationSecondsPerQuestion: 60 },
+    { id: 'exam-ipa-1', title: 'Latihan ANBK IPA', subject: 'IPA', phase: 'D', durationMinutes: 60, questionIds: ['q4', 'q5', 'q6', 'q7', 'q9', 'q18'], durationType: 'per-exam', durationSecondsPerQuestion: 60 },
+    { id: 'exam-bing-1', title: 'Listening Comprehension', subject: 'Bahasa Inggris', phase: 'F', durationMinutes: 45, questionIds: ['q8', 'q11', 'q16'], durationType: 'per-exam', durationSecondsPerQuestion: 60 },
+    { id: 'exam-multimedia-1', title: 'Simulasi Ujian Multimedia (AKM)', subject: 'Seni dan Seni Suara', phase: 'F', durationMinutes: 30, questionIds: ['q16', 'q17', 'q18', 'q15'], durationType: 'per-exam', durationSecondsPerQuestion: 60 }
 ];
+
+export let mockExams: Exam[] = loadData(EXAMS_STORAGE_KEY, initialExams);
+
+export const saveExams = () => {
+     try {
+        localStorage.setItem(EXAMS_STORAGE_KEY, JSON.stringify(mockExams));
+    } catch (error) {
+        console.error("Error saving exam data to localStorage", error);
+    }
+};
+
+export const updateExamDuration = async (
+    examId: string, 
+    durationType: 'per-exam' | 'per-question', 
+    durationMinutes: number, 
+    durationSecondsPerQuestion: number
+): Promise<boolean> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            const index = mockExams.findIndex(e => e.id === examId);
+            if (index !== -1) {
+                mockExams[index].durationType = durationType;
+                mockExams[index].durationMinutes = durationMinutes;
+                mockExams[index].durationSecondsPerQuestion = durationSecondsPerQuestion;
+                saveExams();
+                resolve(true);
+            } else {
+                resolve(false);
+            }
+        }, 300);
+    });
+};
+
+export const deleteMultipleExams = async (examIds: string[]): Promise<boolean> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            let updated = false;
+            examIds.forEach(id => {
+                const index = mockExams.findIndex(e => e.id === id);
+                if (index !== -1) {
+                    mockExams.splice(index, 1);
+                    updated = true;
+                }
+            });
+            if (updated) {
+                saveExams();
+            }
+            resolve(updated);
+        }, 300);
+    });
+};
 
 // Mock API functions
 export const checkNISNData = async (nisn: string): Promise<User | null> => {
@@ -377,3 +497,76 @@ export const updateQuestion = async (updatedQuestion: Question): Promise<boolean
         }, 300);
     });
 };
+
+export const deleteQuestion = async (id: string): Promise<boolean> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            const index = mockQuestions.findIndex(q => q.id === id);
+            if (index !== -1) {
+                mockQuestions.splice(index, 1);
+                saveQuestions();
+                resolve(true);
+            } else {
+                resolve(false);
+            }
+        }, 300);
+    });
+};
+
+export const deleteMultipleQuestions = async (ids: string[]): Promise<boolean> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            let updated = false;
+            ids.forEach(id => {
+                const index = mockQuestions.findIndex(q => q.id === id);
+                if (index !== -1) {
+                    mockQuestions.splice(index, 1);
+                    updated = true;
+                }
+            });
+            if (updated) {
+                saveQuestions();
+            }
+            resolve(updated);
+        }, 300);
+    });
+};
+
+export const addTeacherOrAdminUser = (userData: { username: string, fullName: string, password?: string, role: Role, subject?: string }): { success: boolean, message: string } => {
+    const username = userData.username.trim();
+    if (!username || !userData.fullName) {
+        return { success: false, message: 'Nama Lengkap dan Username wajib diisi.' };
+    }
+
+    const exists = mockUsers.some(u => u.username.toLowerCase() === username.toLowerCase());
+    if (exists) {
+        return { success: false, message: `Username "${username}" sudah digunakan oleh pengguna lain.` };
+    }
+
+    const pin = userData.password?.trim() || Math.floor(100000 + Math.random() * 900000).toString();
+    const newUser: User = {
+        id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        username: username,
+        fullName: userData.fullName.trim(),
+        role: userData.role,
+        password: pin,
+        details: {
+            subject: userData.subject || 'Semua Mapel'
+        }
+    };
+
+    mockUsers.push(newUser);
+    saveUsers();
+    return { success: true, message: 'Pengguna berhasil ditambahkan!' };
+};
+
+export const deleteTeacherOrAdminUser = (username: string): boolean => {
+    const initialLength = mockUsers.length;
+    mockUsers = mockUsers.filter(u => !(u.username === username && (u.role === Role.TEACHER || u.role === Role.ADMIN)));
+    const wasDeleted = mockUsers.length < initialLength;
+    if (wasDeleted) {
+        saveUsers();
+    }
+    return wasDeleted;
+};
+
