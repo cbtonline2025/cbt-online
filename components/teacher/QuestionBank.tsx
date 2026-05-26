@@ -513,7 +513,7 @@ const QuestionBank: React.FC = () => {
                 mediaUrl: '', 
                 promptText: '',
                 type: QuestionType.MULTIPLE_CHOICE, 
-                subject: '', 
+                subject: assignedSubject || '', 
                 phase: 'F',
                 options: [{ text: '' }, { text: '' }, { text: '' }, { text: '' }],
                 correctAnswerIndex: 0, 
