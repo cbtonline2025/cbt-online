@@ -1,34 +1,40 @@
 import React, { useState } from 'react';
 import { User } from '../../types';
 import Button from '../ui/Button';
-import { Users, Monitor, Settings, LogOut, ChevronLeft } from 'lucide-react';
+import { Users, Monitor, Settings, LogOut, ChevronLeft, Database, BarChart3, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import ExamMonitoring from './ExamMonitoring';
 import StudentManager from '../shared/StudentManager';
+import QuestionBank from '../teacher/QuestionBank';
+import ExamSettings from '../teacher/ExamSettings';
+import ResultsAnalysis from '../teacher/ResultsAnalysis';
 
 const DashboardCard: React.FC<{ 
     title: string; 
     description: string; 
     icon: React.ReactNode; 
     onClick: () => void;
-    color: 'teal' | 'indigo' | 'amber';
+    color: 'teal' | 'indigo' | 'amber' | 'violet';
 }> = ({ title, description, icon, onClick, color }) => {
     const colorGradients = {
-        teal: 'from-emerald-500/[0.08] via-teal-500/[0.03] to-transparent border-emerald-500/20 text-emerald-600 dark:text-teal-400 hover:border-emerald-450 dark:hover:border-teal-500/50 hover:bg-emerald-500/[0.02]',
+        teal: 'from-emerald-500/[0.08] via-teal-500/[0.03] to-transparent border-emerald-500/20 text-emerald-600 dark:text-teal-400 hover:border-emerald-455 dark:hover:border-teal-500/50 hover:bg-emerald-500/[0.02]',
         indigo: 'from-indigo-500/[0.08] via-purple-500/[0.03] to-transparent border-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:border-indigo-455 dark:hover:border-indigo-500/50 hover:bg-indigo-500/[0.02]',
-        amber: 'from-amber-500/[0.08] via-orange-500/[0.03] to-transparent border-amber-500/20 text-amber-600 dark:text-amber-400 hover:border-amber-455 dark:hover:border-amber-500/50 hover:bg-amber-500/[0.02]'
+        amber: 'from-amber-500/[0.08] via-orange-500/[0.03] to-transparent border-amber-500/20 text-amber-600 dark:text-amber-400 hover:border-amber-455 dark:hover:border-amber-500/50 hover:bg-amber-500/[0.02]',
+        violet: 'from-violet-500/[0.08] via-fuchsia-500/[0.03] to-transparent border-violet-500/20 text-violet-650 dark:text-violet-400 hover:border-violet-455 dark:hover:border-violet-500/50 hover:bg-violet-500/[0.02]'
     };
     
     const highlightGlows = {
         teal: 'bg-gradient-to-br from-emerald-500/25 to-teal-500/25',
         indigo: 'bg-gradient-to-br from-indigo-500/25 to-purple-500/25',
-        amber: 'bg-gradient-to-br from-amber-500/25 to-orange-500/25'
+        amber: 'bg-gradient-to-br from-amber-500/25 to-orange-500/25',
+        violet: 'bg-gradient-to-br from-violet-500/25 to-fuchsia-500/25'
     };
 
     const borders = {
         teal: 'hover:shadow-[0_20px_50px_rgba(16,185,129,0.15)] focus:ring-emerald-500',
         indigo: 'hover:shadow-[0_20px_50px_rgba(99,102,241,0.15)] focus:ring-indigo-500',
-        amber: 'hover:shadow-[0_20px_50px_rgba(245,158,11,0.15)] focus:ring-amber-500'
+        amber: 'hover:shadow-[0_20px_50px_rgba(245,158,11,0.15)] focus:ring-amber-500',
+        violet: 'hover:shadow-[0_20px_50px_rgba(139,92,246,0.15)] focus:ring-violet-500'
     };
 
     return (
@@ -70,7 +76,7 @@ const DashboardCard: React.FC<{
 
 
 const AdminDashboard: React.FC<{ user: User, logout: () => void }> = ({ user, logout }) => {
-  const [view, setView] = useState<'dashboard' | 'monitoring' | 'students'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'monitoring' | 'students' | 'question_bank' | 'results' | 'exam_settings'>('dashboard');
 
   return (
     <motion.div 
@@ -139,18 +145,44 @@ const AdminDashboard: React.FC<{ user: User, logout: () => void }> = ({ user, lo
                 <DashboardCard
                     title="Pengaturan Ujian"
                     description="Aktifkan ujian, buat rilis token, manipulasi jadwal, dan kelola sesi ujian secara praktis."
-                    onClick={() => alert('Fitur Pengaturan Ujian segera hadir!')}
+                    onClick={() => setView('exam_settings')}
                     color="amber"
                     icon={<Settings className="h-6 w-6" />}
+                />
+                <DashboardCard
+                    title="Bank Soal Cetak & Impor"
+                    description="Kelola bank data pertanyaan, impor berkas Word/Excel, edit konten, atau ekspor instan."
+                    onClick={() => setView('question_bank')}
+                    color="violet"
+                    icon={<Database className="h-6 w-6" />}
+                />
+                <DashboardCard
+                    title="Analisis Hasil & Rekap Nilai"
+                    description="Tinjau performa siswa secara otomatis, koreksi jawaban esai, dan cetak pelaporan rekap."
+                    onClick={() => setView('results')}
+                    color="teal"
+                    icon={<BarChart3 className="h-6 w-6" />}
                 />
             </div>
         ) : view === 'students' ? (
             <div className="animate-fade-in relative">
                 <StudentManager />
             </div>
-        ) : (
+        ) : view === 'monitoring' ? (
             <div className="animate-fade-in relative">
                 <ExamMonitoring />
+            </div>
+        ) : view === 'question_bank' ? (
+            <div className="animate-fade-in relative bg-slate-500/[0.01] p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800">
+                <QuestionBank />
+            </div>
+        ) : view === 'exam_settings' ? (
+            <div className="animate-fade-in relative bg-slate-500/[0.01] p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800">
+                <ExamSettings />
+            </div>
+        ) : (
+            <div className="animate-fade-in relative bg-slate-500/[0.01] p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800">
+                <ResultsAnalysis />
             </div>
         )}
     </motion.div>

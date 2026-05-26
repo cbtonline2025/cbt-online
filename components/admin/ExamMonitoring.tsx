@@ -165,7 +165,19 @@ interface LogEntry {
 }
 
 const ExamMonitoring: React.FC = () => {
-  const [students, setStudents] = useState<ActiveStudent[]>(INITIAL_ACTIVE_STUDENTS);
+  const [students, setStudents] = useState<ActiveStudent[]>(() => {
+    try {
+      const stored = window.localStorage.getItem('cbt-merdeka-active-students');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+      // If none, populate localStorage and use INITIAL_ACTIVE_STUDENTS
+      window.localStorage.setItem('cbt-merdeka-active-students', JSON.stringify(INITIAL_ACTIVE_STUDENTS));
+    } catch (error) {
+      console.error("Failed to initialize students from localStorage", error);
+    }
+    return INITIAL_ACTIVE_STUDENTS;
+  });
   const [logs, setLogs] = useState<LogEntry[]>([
     { id: 'l1', time: '19:40:12', message: 'Ujian Akhir Semester Fisika resmi dibuka oleh Proktor.', type: 'system' },
     { id: 'l2', time: '19:41:05', message: 'Ahmad Prasetyo berhasil login ke sesi ujian.', type: 'info' },
@@ -205,6 +217,40 @@ const ExamMonitoring: React.FC = () => {
       setCurrentTimeStr(d.toTimeString().split(' ')[0]);
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Save changes to localStorage whenever the students state updates
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('cbt-merdeka-active-students', JSON.stringify(students));
+    } catch (error) {
+      console.error("Failed to save student progress to localStorage", error);
+    }
+  }, [students]);
+
+  // Synchronize student progress by polling localStorage every 5 seconds
+  useEffect(() => {
+    const syncInterval = setInterval(() => {
+      try {
+        const stored = window.localStorage.getItem('cbt-merdeka-active-students');
+        if (stored) {
+          const parsed = JSON.parse(stored) as ActiveStudent[];
+          
+          setStudents(prevStudents => {
+            // Compare string representations to prevent infinite React loops
+            if (JSON.stringify(prevStudents) !== JSON.stringify(parsed)) {
+              console.log("[POLLING] Synchronized student progress with localStorage.");
+              return parsed;
+            }
+            return prevStudents;
+          });
+        }
+      } catch (error) {
+        console.error("Failed to poll student progress from localStorage", error);
+      }
+    }, 5000);
+
+    return () => clearInterval(syncInterval);
   }, []);
 
   // Helper to add logs cleanly

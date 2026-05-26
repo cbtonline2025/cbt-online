@@ -49,12 +49,51 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onStartExam, 
 
   const availableExams = useMemo(() => {
     const studentPhase = gradeLevel >= 10 ? 'F' : 'D'; // Simplified logic
-    return mockExams.filter(exam => exam.phase === studentPhase);
+    const now = new Date();
+    return mockExams.filter(exam => {
+      if (exam.phase !== studentPhase) return false;
+      
+      // If manually forced live, bypass standard scheduling checks
+      if (exam.forceLive) return true;
+
+      // If start and end dates exist, check if we are in that window
+      if (exam.startDate || exam.endDate) {
+        const start = exam.startDate ? new Date(exam.startDate) : null;
+        const end = exam.endDate ? new Date(exam.endDate) : null;
+        
+        if (start && now < start) return false;
+        if (end && now > end) return false;
+      }
+      return true;
+    });
   }, [gradeLevel]);
 
   const handleStartExam = () => {
       const exam = mockExams.find(e => e.id === token);
       if (exam) {
+        const studentPhase = gradeLevel >= 10 ? 'F' : 'D';
+        if (exam.phase !== studentPhase) {
+          alert("Fase ujian tidak sesuai dengan kelas Anda.");
+          return;
+        }
+
+        if (exam.forceLive) {
+          // Manually triggered Live status: override scheduled window entirely
+        } else if (exam.startDate || exam.endDate) {
+          const now = new Date();
+          const start = exam.startDate ? new Date(exam.startDate) : null;
+          const end = exam.endDate ? new Date(exam.endDate) : null;
+          
+          if (start && now < start) {
+            alert(`Ujian belum dimulai. Jadwal mulai: ${new Date(start).toLocaleString('id-ID')}`);
+            return;
+          }
+          if (end && now > end) {
+            alert("Sesi ujian sudah berakhir.");
+            return;
+          }
+        }
+
         onStartExam(exam.id);
       } else {
         alert("Token ujian tidak valid.");

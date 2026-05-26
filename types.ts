@@ -73,6 +73,9 @@ export interface Exam {
     questionIds: string[];
     durationType?: 'per-exam' | 'per-question';
     durationSecondsPerQuestion?: number;
+    startDate?: string;
+    endDate?: string;
+    forceLive?: boolean;
 }
 
 export interface StudentAnswer {

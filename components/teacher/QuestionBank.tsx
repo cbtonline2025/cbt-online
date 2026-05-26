@@ -642,6 +642,163 @@ const QuestionBank: React.FC = () => {
         document.body.removeChild(link);
     };
 
+    const handleExportToExcel = () => {
+        if (filteredQuestions.length === 0) {
+            alert("Tidak ada soal untuk diekspor.");
+            return;
+        }
+
+        const dataRows = filteredQuestions.map(q => {
+            const row: any = {
+                id: q.id,
+                content: q.content,
+                type: q.type,
+                subject: q.subject,
+                phase: q.phase,
+            };
+
+            if (q.type === QuestionType.MULTIPLE_CHOICE && q.options) {
+                const optionLetters = ['A', 'B', 'C', 'D', 'E'];
+                q.options.forEach((opt, index) => {
+                    row[`option${optionLetters[index]}`] = opt.text;
+                });
+                
+                const correctIndex = q.options.findIndex(opt => opt.id === q.correctAnswer);
+                row.correctAnswer = correctIndex !== -1 ? optionLetters[correctIndex] : '';
+            } else { // Essay
+                row.correctAnswer = q.correctAnswer;
+            }
+            return row;
+        });
+
+        const headers = [
+            'id', 'content', 'type', 'subject', 'phase', 
+            'optionA', 'optionB', 'optionC', 'optionD', 'optionE', 
+            'correctAnswer'
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(dataRows, { header: headers });
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Bank Soal");
+        XLSX.writeFile(workbook, `bank_soal_${new Date().toISOString().slice(0,10)}.xlsx`);
+    };
+
+    const handleExportToWord = () => {
+        if (filteredQuestions.length === 0) {
+            alert("Tidak ada soal untuk diekspor.");
+            return;
+        }
+
+        const docChildren: any[] = [
+            new Paragraph({
+                text: "KARTU SOAL & DATA BANK SOAL - CBT",
+                heading: HeadingLevel.HEADING_1,
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 200 }
+            }),
+            new Paragraph({
+                text: `Hasil Ekspor Otomatis | Tanggal: ${new Date().toLocaleDateString('id-ID')} | Jumlah Soal: ${filteredQuestions.length}`,
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 400 }
+            })
+        ];
+
+        filteredQuestions.forEach((q, idx) => {
+            // Header No. Soal
+            docChildren.push(
+                new Paragraph({
+                    children: [
+                        new TextRun({ text: `SOAL NO. ${idx + 1} (${q.type === QuestionType.MULTIPLE_CHOICE ? 'PILIHAN GANDA' : 'ESAI'})`, bold: true, color: "4F46E5" }),
+                        new TextRun({ text: `  |  Mata Pelajaran: ${q.subject}  |  Fase: ${q.phase}`, italics: true, color: "6B7280" }),
+                    ],
+                    spacing: { before: 200, after: 100 }
+                })
+            );
+
+            // Konten Pertanyaan
+            docChildren.push(
+                new Paragraph({
+                    children: [
+                        new TextRun({ text: q.content, size: 24 })
+                    ],
+                    spacing: { after: 150 }
+                })
+            );
+
+            // Opsional Media
+            if (q.mediaType && q.mediaUrl) {
+                docChildren.push(
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: `[Lampiran Media: ${q.mediaType} (${q.mediaUrl})]`, italics: true, color: "2563EB" })
+                        ],
+                        spacing: { after: 100 }
+                    })
+                );
+            }
+
+            // Opsi Jawaban (Pilihan Ganda) atau Kunci Esai
+            if (q.type === QuestionType.MULTIPLE_CHOICE && q.options) {
+                const letters = ['A', 'B', 'C', 'D', 'E'];
+                q.options.forEach((opt, oIdx) => {
+                    const isCorrect = opt.id === q.correctAnswer;
+                    docChildren.push(
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: `   ${letters[oIdx]}. `, bold: true }),
+                                new TextRun({ text: opt.text, size: 22 }),
+                                isCorrect ? new TextRun({ text: "  [Kunci Jawaban]", bold: true, color: "10B981" }) : null
+                            ].filter(Boolean) as any[],
+                            spacing: { after: 80 }
+                        })
+                    );
+                });
+            } else {
+                docChildren.push(
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: "Kunci Jawaban Esai: ", bold: true, color: "10B981" }),
+                            new TextRun({ text: q.correctAnswer || "-", italics: true })
+                        ],
+                        spacing: { after: 150 }
+                    })
+                );
+            }
+
+            // Separator Line
+            docChildren.push(
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: "_________________________________________________________________________________",
+                            color: "E5E7EB"
+                        })
+                    ],
+                    spacing: { after: 200 }
+                })
+            );
+        });
+
+        const doc = new Document({
+            sections: [{
+                properties: {},
+                children: docChildren,
+            }]
+        });
+
+        Packer.toBlob(doc).then(blob => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `bank_soal_${new Date().toISOString().slice(0, 10)}.docx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }).catch(err => {
+            alert("Gagal mengekspor bank data ke Word: " + err.message);
+        });
+    };
+
     const parseXLSX = (file: File): Promise<Question[]> => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -1628,10 +1785,20 @@ const QuestionBank: React.FC = () => {
             <div>
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
                      <h3 className="text-xl font-semibold text-slate-800 dark:text-white">Daftar Soal ({filteredQuestions.length})</h3>
-                     <Button onClick={handleExportToCSV} variant="secondary" className="py-2 px-4 text-sm flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                        Ekspor ke CSV
-                    </Button>
+                     <div className="flex flex-wrap gap-2">
+                         <Button onClick={handleExportToExcel} variant="secondary" className="py-2 px-4 text-sm flex items-center gap-2 border border-emerald-500/30 hover:border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-emerald-50/20 dark:bg-emerald-950/20">
+                            <FileSpreadsheet className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                            Ekspor Excel (.xlsx)
+                         </Button>
+                         <Button onClick={handleExportToWord} variant="secondary" className="py-2 px-4 text-sm flex items-center gap-2 border border-blue-500/30 hover:border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50/20 dark:bg-blue-950/20">
+                            <FileText className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                            Ekspor Word (.docx)
+                         </Button>
+                         <Button onClick={handleExportToCSV} variant="secondary" className="py-2 px-4 text-sm flex items-center gap-2 border border-slate-500/30 hover:border-slate-500">
+                            <Download className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+                            Ekspor CSV
+                         </Button>
+                     </div>
                 </div>
                 
                 <div className="bg-white/30 dark:bg-slate-900/50 p-4 rounded-lg mb-4">
@@ -1651,8 +1818,8 @@ const QuestionBank: React.FC = () => {
                                 {uniqueSubjects.map(sub => (
                                     <option key={sub} value={sub}>
                                         {sub === 'all' 
-                                            ? `Semua Mapel (${questions.length})` 
-                                            : `${sub} (${subjectCounts[sub] || 0})`
+                                            ? `Semua Mapel (${questions.length} Soal)` 
+                                            : `${sub} (${subjectCounts[sub] || 0} Soal)`
                                         }
                                     </option>
                                 ))}

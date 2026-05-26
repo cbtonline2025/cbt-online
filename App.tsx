@@ -150,7 +150,7 @@ const App: React.FC = () => {
       case View.EXAM_SESSION:
         return activeExamId && currentUser && <ExamInterface examId={activeExamId} onFinishExam={finishExam} user={currentUser} />;
       case View.EXAM_END_SCREEN:
-        return lastExamResult && <ExamEndScreen result={lastExamResult} onReturnToDashboard={returnToDashboard} />;
+        return lastExamResult && <ExamEndScreen result={lastExamResult} user={currentUser} onReturnToDashboard={returnToDashboard} />;
 
       default:
         return <Login onRegisterClick={() => setCurrentView(View.REGISTER)} />;

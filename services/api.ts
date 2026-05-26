@@ -353,7 +353,10 @@ export const updateExamDuration = async (
     examId: string, 
     durationType: 'per-exam' | 'per-question', 
     durationMinutes: number, 
-    durationSecondsPerQuestion: number
+    durationSecondsPerQuestion: number,
+    startDate?: string,
+    endDate?: string,
+    forceLive?: boolean
 ): Promise<boolean> => {
     return new Promise(resolve => {
         setTimeout(() => {
@@ -362,6 +365,9 @@ export const updateExamDuration = async (
                 mockExams[index].durationType = durationType;
                 mockExams[index].durationMinutes = durationMinutes;
                 mockExams[index].durationSecondsPerQuestion = durationSecondsPerQuestion;
+                mockExams[index].startDate = startDate;
+                mockExams[index].endDate = endDate;
+                mockExams[index].forceLive = forceLive;
                 saveExams();
                 resolve(true);
             } else {

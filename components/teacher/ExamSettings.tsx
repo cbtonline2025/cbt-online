@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Clock, BookOpen, Layers, Settings, CheckCircle2, AlertTriangle, Hourglass, ArrowRight, Trash2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Clock, BookOpen, Layers, Settings, CheckCircle2, AlertTriangle, Hourglass, ArrowRight, Trash2, AlertCircle, Calendar, Zap, Play } from 'lucide-react';
 import { Exam } from '../../types';
 import { mockExams, updateExamDuration, deleteMultipleExams } from '../../services/api';
 import Button from '../ui/Button';
@@ -12,11 +12,127 @@ const ExamSettings: React.FC = () => {
     const [durationType, setDurationType] = useState<'per-exam' | 'per-question'>('per-exam');
     const [durationMinutes, setDurationMinutes] = useState<number>(60);
     const [durationSecondsPerQuestion, setDurationSecondsPerQuestion] = useState<number>(60);
+    const [isScheduled, setIsScheduled] = useState<boolean>(false);
+    const [examStartDate, setExamStartDate] = useState<string>('');
+    const [examEndDate, setExamEndDate] = useState<string>('');
+    const [forceLive, setForceLive] = useState<boolean>(false);
     const [isSaving, setIsSaving] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const [selectedExamIds, setSelectedExamIds] = useState<string[]>([]);
     const [isBulkDeletingConfirmOpen, setIsBulkDeletingConfirmOpen] = useState(false);
+    const [hasDraftRecovered, setHasDraftRecovered] = useState(false);
+
+    const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+    // Periodically update current time to dynamically refresh scheduling status badges in real-time
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 5000); // refresh every 5s for smooth, accurate updates
+        return () => clearInterval(interval);
+    }, []);
+
+    // Load draft if it exists when opening settings
+    const handleOpenSettings = (exam: Exam) => {
+        setSelectedExam(exam);
+        setSuccessMessage(null);
+
+        try {
+            const stored = localStorage.getItem('cbt-merdeka-pending-exam-configs');
+            const configs = stored ? JSON.parse(stored) : {};
+            const draft = configs[exam.id];
+
+            if (draft) {
+                setDurationType(draft.durationType);
+                setDurationMinutes(draft.durationMinutes);
+                setDurationSecondsPerQuestion(draft.durationSecondsPerQuestion);
+                setIsScheduled(!!(draft.startDate || draft.endDate));
+                setExamStartDate(draft.startDate || '');
+                setExamEndDate(draft.endDate || '');
+                setForceLive(draft.forceLive || false);
+                setHasDraftRecovered(true);
+            } else {
+                setDurationType(exam.durationType || 'per-exam');
+                setDurationMinutes(exam.durationMinutes || 60);
+                setDurationSecondsPerQuestion(exam.durationSecondsPerQuestion || 60);
+                setIsScheduled(!!(exam.startDate || exam.endDate));
+                setExamStartDate(exam.startDate || '');
+                setExamEndDate(exam.endDate || '');
+                setForceLive(exam.forceLive || false);
+                setHasDraftRecovered(false);
+            }
+        } catch (error) {
+            console.error("Gagal membaca rancangan tersimpan:", error);
+            setDurationType(exam.durationType || 'per-exam');
+            setDurationMinutes(exam.durationMinutes || 60);
+            setDurationSecondsPerQuestion(exam.durationSecondsPerQuestion || 60);
+            setIsScheduled(!!(exam.startDate || exam.endDate));
+            setExamStartDate(exam.startDate || '');
+            setExamEndDate(exam.endDate || '');
+            setForceLive(exam.forceLive || false);
+            setHasDraftRecovered(false);
+        }
+    };
+
+    // Auto-save changes to localStorage as a draft if they differ from original values
+    useEffect(() => {
+        if (!selectedExam) return;
+
+        const isModified = 
+            durationType !== (selectedExam.durationType || 'per-exam') ||
+            durationMinutes !== (selectedExam.durationMinutes || 60) ||
+            durationSecondsPerQuestion !== (selectedExam.durationSecondsPerQuestion || 60) ||
+            isScheduled !== (!!(selectedExam.startDate || selectedExam.endDate)) ||
+            examStartDate !== (selectedExam.startDate || '') ||
+            examEndDate !== (selectedExam.endDate || '') ||
+            forceLive !== (selectedExam.forceLive || false);
+
+        if (isModified) {
+            try {
+                const stored = localStorage.getItem('cbt-merdeka-pending-exam-configs');
+                const configs = stored ? JSON.parse(stored) : {};
+                configs[selectedExam.id] = {
+                    examId: selectedExam.id,
+                    durationType,
+                    durationMinutes,
+                    durationSecondsPerQuestion,
+                    startDate: isScheduled ? examStartDate : undefined,
+                    endDate: isScheduled ? examEndDate : undefined,
+                    forceLive,
+                    lastSavedAt: new Date().toISOString()
+                };
+                localStorage.setItem('cbt-merdeka-pending-exam-configs', JSON.stringify(configs));
+            } catch (error) {
+                console.error("Gagal menyimpan rancangan otomatis:", error);
+            }
+        }
+    }, [selectedExam, durationType, durationMinutes, durationSecondsPerQuestion, isScheduled, examStartDate, examEndDate, forceLive]);
+
+    // Revert settings to original and delete draft from localStorage
+    const handleResetToOriginal = () => {
+        if (!selectedExam) return;
+
+        setDurationType(selectedExam.durationType || 'per-exam');
+        setDurationMinutes(selectedExam.durationMinutes || 60);
+        setDurationSecondsPerQuestion(selectedExam.durationSecondsPerQuestion || 60);
+        setIsScheduled(!!(selectedExam.startDate || selectedExam.endDate));
+        setExamStartDate(selectedExam.startDate || '');
+        setExamEndDate(selectedExam.endDate || '');
+        setForceLive(selectedExam.forceLive || false);
+
+        try {
+            const stored = localStorage.getItem('cbt-merdeka-pending-exam-configs');
+            if (stored) {
+                const configs = JSON.parse(stored);
+                delete configs[selectedExam.id];
+                localStorage.setItem('cbt-merdeka-pending-exam-configs', JSON.stringify(configs));
+            }
+        } catch (error) {
+            console.error("Gagal menghapus rancangan:", error);
+        }
+        setHasDraftRecovered(false);
+    };
 
     const handleBulkDeleteExams = async () => {
         try {
@@ -34,14 +150,6 @@ const ExamSettings: React.FC = () => {
         }
     };
 
-    const handleOpenSettings = (exam: Exam) => {
-        setSelectedExam(exam);
-        setDurationType(exam.durationType || 'per-exam');
-        setDurationMinutes(exam.durationMinutes || 60);
-        setDurationSecondsPerQuestion(exam.durationSecondsPerQuestion || 60);
-        setSuccessMessage(null);
-    };
-
     const handleSave = async () => {
         if (!selectedExam) return;
         setIsSaving(true);
@@ -50,15 +158,34 @@ const ExamSettings: React.FC = () => {
                 selectedExam.id,
                 durationType,
                 durationMinutes,
-                durationSecondsPerQuestion
+                durationSecondsPerQuestion,
+                isScheduled ? examStartDate : undefined,
+                isScheduled ? examEndDate : undefined,
+                forceLive
             );
             if (success) {
+                // Remove draft from localStorage upon successful save
+                try {
+                    const stored = localStorage.getItem('cbt-merdeka-pending-exam-configs');
+                    if (stored) {
+                        const configs = JSON.parse(stored);
+                        delete configs[selectedExam.id];
+                        localStorage.setItem('cbt-merdeka-pending-exam-configs', JSON.stringify(configs));
+                    }
+                } catch (error) {
+                    console.error("Gagal membersihkan rancangan yang disimpan:", error);
+                }
+                setHasDraftRecovered(false);
+
                 // Update local list
                 setExams(prev => prev.map(e => e.id === selectedExam.id ? {
                     ...e,
                     durationType,
                     durationMinutes,
-                    durationSecondsPerQuestion
+                    durationSecondsPerQuestion,
+                    startDate: isScheduled ? examStartDate : undefined,
+                    endDate: isScheduled ? examEndDate : undefined,
+                    forceLive
                 } : e));
                 setSuccessMessage("Pengaturan durasi ujian berhasil disimpan!");
                 setTimeout(() => {
@@ -143,6 +270,32 @@ const ExamSettings: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {exams.map((exam, index) => {
                         const isPerQuestion = exam.durationType === 'per-question';
+                        
+                        // Calculate scheduling status badge
+                        const now = currentTime;
+                        const start = exam.startDate ? new Date(exam.startDate) : null;
+                        const end = exam.endDate ? new Date(exam.endDate) : null;
+                        
+                        let statusText = 'Live';
+                        let badgeStyle = 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-450 border border-emerald-150/30 dark:border-emerald-950/30';
+                        
+                        if (exam.forceLive) {
+                            statusText = 'Live (Override)';
+                            badgeStyle = 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-650 dark:text-indigo-400 border border-indigo-150/30 dark:border-indigo-950/30 font-black';
+                        } else if (start && now < start) {
+                            statusText = 'Upcoming';
+                            badgeStyle = 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-150/30 dark:border-amber-900/30';
+                        } else if (end && now > end) {
+                            statusText = 'Ended';
+                            badgeStyle = 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-450 border border-rose-150/30 dark:border-rose-900/30';
+                        } else if (start || end) {
+                            statusText = 'Live';
+                            badgeStyle = 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-450 border border-emerald-150/30 dark:border-emerald-950/30';
+                        } else {
+                            statusText = 'Always Live';
+                            badgeStyle = 'bg-slate-100 dark:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800';
+                        }
+
                         return (
                             <motion.div
                                 key={exam.id}
@@ -154,7 +307,7 @@ const ExamSettings: React.FC = () => {
                                 <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl group-hover:scale-110 transition-transform"></div>
                                 
                                 <div>
-                                    <div className="flex items-center justify-between gap-2 mb-4">
+                                    <div className="flex items-center justify-between gap-4 mb-4">
                                         <div className="flex items-center gap-3">
                                             <input
                                                 type="checkbox"
@@ -174,6 +327,10 @@ const ExamSettings: React.FC = () => {
                                                 {exam.subject}
                                             </span>
                                         </div>
+                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${badgeStyle} flex items-center gap-1.5 shrink-0`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${statusText === 'Live (Override)' ? 'bg-indigo-500 animate-pulse' : statusText === 'Live' || statusText === 'Always Live' ? 'bg-emerald-500 animate-pulse' : statusText === 'Upcoming' ? 'bg-amber-500' : 'bg-rose-500'}`} />
+                                            {statusText}
+                                        </span>
                                     </div>
 
                                     <h4 className="text-lg font-black text-slate-900 dark:text-white leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors mb-2">
@@ -199,6 +356,41 @@ const ExamSettings: React.FC = () => {
                                                     : `${exam.durationMinutes} Menit`
                                                 }
                                             </span>
+                                        </div>
+                                        <div className="flex flex-col gap-1 text-xs text-slate-550 dark:text-slate-400 border-t border-slate-150 dark:border-slate-800/80 pt-2 mt-2">
+                                            <span className="flex items-center gap-1.5 font-semibold"><Calendar className="w-4 h-4 text-indigo-400" /> Jadwal Sesi:</span>
+                                            <div className="pl-5.5">
+                                                {exam.startDate || exam.endDate ? (
+                                                    <div className="space-y-0.5 mt-0.5">
+                                                        {exam.startDate && (
+                                                            <p className="text-[11px] font-medium text-slate-600 dark:text-slate-350">
+                                                                Mulai: <span className="font-mono font-bold">{new Date(exam.startDate).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                                            </p>
+                                                        )}
+                                                        {exam.endDate && (
+                                                            <p className="text-[11px] font-medium text-slate-600 dark:text-slate-350">
+                                                                Selesai: <span className="font-mono font-bold">{new Date(exam.endDate).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                                            </p>
+                                                        )}
+                                                        <div className="pt-1">
+                                                            {(() => {
+                                                                const now = currentTime;
+                                                                const start = exam.startDate ? new Date(exam.startDate) : null;
+                                                                const end = exam.endDate ? new Date(exam.endDate) : null;
+                                                                if (start && now < start) {
+                                                                    return <span className="inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">Mendatang</span>;
+                                                                } else if (end && now > end) {
+                                                                    return <span className="inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20">Berakhir</span>;
+                                                                } else {
+                                                                    return <span className="inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-450 border border-emerald-500/20">Aktif</span>;
+                                                                }
+                                                            })()}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[11px] text-slate-400 italic">Selalu Aktif (Tidak Dibatasi)</span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -273,6 +465,22 @@ const ExamSettings: React.FC = () => {
                                     </motion.div>
                                 ) : (
                                     <>
+                                        {hasDraftRecovered && (
+                                            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-400 text-xs shadow-sm animate-fade-in gap-2.5">
+                                                <div className="flex items-center gap-2">
+                                                    <AlertTriangle className="w-4 h-4 text-amber-500 animate-pulse flex-shrink-0" />
+                                                    <span className="font-bold leading-normal">Rancangan otomatis dipulihkan dari penyimpanan lokal</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleResetToOriginal}
+                                                    className="px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 transition-colors text-[10px] font-black uppercase text-amber-800 dark:text-amber-300 cursor-pointer flex-shrink-0"
+                                                >
+                                                    Ubah ke Asli
+                                                </button>
+                                            </div>
+                                        )}
+
                                         {/* Selector Type Cards */}
                                         <div>
                                             <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-3">Tipe Konfigurasi Durasi</label>
@@ -318,7 +526,29 @@ const ExamSettings: React.FC = () => {
                                                         onChange={(e) => setDurationMinutes(Math.max(1, parseInt(e.target.value) || 0))}
                                                         placeholder="Contoh: 90"
                                                     />
-                                                    <p className="text-[10px] text-slate-400 dark:text-slate-500">
+
+                                                    {/* Predefined Duration Presets */}
+                                                    <div className="space-y-1.5">
+                                                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Pilihan Cepat Durasi</span>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {[15, 30, 45, 60, 90, 120, 180].map((preset) => (
+                                                                <button
+                                                                    key={preset}
+                                                                    type="button"
+                                                                    onClick={() => setDurationMinutes(preset)}
+                                                                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                                                                        durationMinutes === preset
+                                                                            ? 'bg-indigo-600 text-white border-indigo-600 dark:bg-indigo-500 dark:border-indigo-500 shadow-sm'
+                                                                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                                                    }`}
+                                                                >
+                                                                    {preset} Menit {preset === 60 ? '(1 Jam)' : preset === 90 ? '(1.5 Jam)' : preset === 120 ? '(2 Jam)' : preset === 180 ? '(3 Jam)' : ''}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 pt-1">
                                                         *Siswa memiliki total durasi pengerjaan tertulis untuk menyelesaikan semua {selectedExam?.questionIds.length || 0} soal.
                                                     </p>
                                                 </motion.div>
@@ -336,13 +566,170 @@ const ExamSettings: React.FC = () => {
                                                         onChange={(e) => setDurationSecondsPerQuestion(Math.max(5, parseInt(e.target.value) || 0))}
                                                         placeholder="Contoh: 60"
                                                     />
-                                                    <p className="text-[10px] text-orange-500 dark:text-orange-400 font-bold flex items-start gap-1">
+
+                                                    {/* Predefined Seconds Presets */}
+                                                    <div className="space-y-1.5">
+                                                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Pilihan Cepat Waktu</span>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {[10, 20, 30, 45, 60, 90, 120, 180].map((preset) => (
+                                                                <button
+                                                                    key={preset}
+                                                                    type="button"
+                                                                    onClick={() => setDurationSecondsPerQuestion(preset)}
+                                                                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                                                                        durationSecondsPerQuestion === preset
+                                                                            ? 'bg-indigo-600 text-white border-indigo-600 dark:bg-indigo-500 dark:border-indigo-500 shadow-sm'
+                                                                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                                                    }`}
+                                                                >
+                                                                    {preset} Detik
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <p className="text-[10px] text-orange-500 dark:text-orange-400 font-bold flex items-start gap-1 pt-1">
                                                         <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                                                         <span>Timer tersendiri akan berjalan per nomor. Jika habis, siswa otomatis dialihkan ke nomor berikutnya.</span>
                                                     </p>
                                                 </motion.div>
                                             )}
                                         </motion.div>
+
+                                        {/* Scheduler Section */}
+                                        <div className="border-t border-slate-100 dark:border-slate-800 pt-5">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                                                    <Calendar className="w-4 h-4 text-indigo-500" />
+                                                    Jadwal Sesi Ujian (Tanggal & Waktu)
+                                                </label>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10.5px] font-bold text-slate-500 dark:text-slate-400">Batasi Sesi?</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsScheduled(!isScheduled)}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${isScheduled ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-705 dark:bg-slate-800'}`}
+                                                    >
+                                                        <span
+                                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isScheduled ? 'translate-x-6' : 'translate-x-1'}`}
+                                                        />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {isScheduled && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                    exit={{ opacity: 0, height: 0 }}
+                                                    className="space-y-4 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 overflow-hidden"
+                                                >
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                        <div className="space-y-1.5">
+                                                            <label htmlFor="startDate" className="text-xs font-semibold text-slate-650 dark:text-slate-350">Waktu Mulai</label>
+                                                            <input
+                                                                id="startDate"
+                                                                type="datetime-local"
+                                                                value={examStartDate}
+                                                                onChange={(e) => setExamStartDate(e.target.value)}
+                                                                className="w-full h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <label htmlFor="endDate" className="text-xs font-semibold text-slate-650 dark:text-slate-350">Waktu Selesai</label>
+                                                            <input
+                                                                id="endDate"
+                                                                type="datetime-local"
+                                                                value={examEndDate}
+                                                                onChange={(e) => setExamEndDate(e.target.value)}
+                                                                className="w-full h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Live Indicator preview for Proctors while editing */}
+                                                    {(() => {
+                                                        const now = currentTime;
+                                                        const start = examStartDate ? new Date(examStartDate) : null;
+                                                        const end = examEndDate ? new Date(examEndDate) : null;
+                                                        
+                                                        if (start && end && start >= end) {
+                                                            return (
+                                                                <p className="text-[11px] text-rose-500 font-bold flex items-center gap-1">
+                                                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                                                    <span>Waktu selesai harus setelah waktu mulai.</span>
+                                                                </p>
+                                                            );
+                                                        }
+                                                        
+                                                        if (start || end) {
+                                                            return (
+                                                                <div className="flex items-center gap-2 text-[11px] dark:text-slate-300 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800 font-medium">
+                                                                    <span className="font-bold text-slate-500">Status Berdasarkan Waktu Sekarang:</span>
+                                                                    {start && now < start ? (
+                                                                        <span className="text-amber-500 font-bold">Mendatang (Belum Terlihat)</span>
+                                                                    ) : end && now > end ? (
+                                                                        <span className="text-rose-500 font-bold">Berakhir (Tidak Terlihat Lagi)</span>
+                                                                    ) : (
+                                                                        <span className="text-emerald-500 font-bold">Aktif & Terlihat Sekarang</span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                </motion.div>
+                                            )}
+
+                                            {/* Manual Force Live Override Block */}
+                                            <div className="mt-4 p-4 rounded-2xl border bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800 flex flex-col gap-3 shadow-inner">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Zap className="w-4 h-4 text-indigo-500 animate-pulse" />
+                                                        <div>
+                                                             <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 block">Trigger Manual</span>
+                                                             <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">Kontrol Langsung Sesi (Live Override)</h4>
+                                                        </div>
+                                                    </div>
+                                                    {forceLive ? (
+                                                        <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-505/15 bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-150/35 dark:border-indigo-900/35 flex items-center gap-1.5 animate-pulse font-black">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                                            DIPAKSA LIVE
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-405 dark:text-slate-400 border border-slate-205 dark:border-slate-700 font-bold">
+                                                            Mengikuti Jadwal
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <p className="text-[10px] text-slate-550 dark:text-slate-400 leading-normal">
+                                                    Klik tombol di bawah untuk melompati / mengabaikan batasan interval kalender di atas secara manual, membuat status ujian ini seketika berstatus <span className="font-bold text-emerald-650 dark:text-emerald-400">Live</span> bagi semua siswa yang terdaftar.
+                                                </p>
+
+                                                <div className="flex items-center gap-2">
+                                                    {forceLive ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setForceLive(false)}
+                                                            className="w-full py-2.5 px-4 h-10 text-[11px] font-black rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-705 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200 dark:border-slate-700"
+                                                        >
+                                                            <Play className="w-3.5 h-3.5 rotate-180 text-slate-400" />
+                                                            HENTIKAN SEKARANG (KEMBALI KE JADWAL)
+                                                        </button>
+                                                     ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setForceLive(true)}
+                                                            className="w-full py-3 px-4 h-12 text-[11px] font-black rounded-xl bg-indigo-650 bg-indigo-600 hover:bg-indigo-555 hover:bg-indigo-500 text-white hover:shadow-lg hover:shadow-indigo-500/15 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-indigo-550/20 shadow-md"
+                                                        >
+                                                            <Zap className="w-4 h-4 text-amber-300 animate-pulse fill-amber-300" />
+                                                            <span>START EXAM (TRIGGER LIVE LANGSUNG)</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
 
                                         {/* Prompt Details Summary info */}
                                         <div className="flex items-center gap-3 p-4 rounded-xl bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs">

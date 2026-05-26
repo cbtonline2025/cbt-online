@@ -367,7 +367,7 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
                   }}
                   disabled={!confirmChecked}
                   variant="danger"
-                  className="flex-1 py-4 text-xs font-black uppercase tracking-widest rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed bg-rose-600 hover:bg-rose-500 border-none transition-all text-white"
+                  className="flex-1 py-4 text-xs font-black uppercase tracking-widest rounded-full disabled:opacity-40 disabled:cursor-not-allowed bg-rose-600 hover:bg-rose-500 enabled:hover:scale-105 enabled:active:scale-95 border-none transition-all duration-200 text-white"
                 >
                   Kirim Jawaban
                 </Button>
