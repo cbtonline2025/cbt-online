@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Exam, Question, StudentAnswer, ExamResult, User } from '../../types';
 import { fetchExamDetails } from '../../services/api';
 import Spinner from '../ui/Spinner';
@@ -27,6 +27,9 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
   const [violationMessage, setViolationMessage] = useState<string | null>(null);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [confirmChecked, setConfirmChecked] = useState(false);
+  const [restoredNotice, setRestoredNotice] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const isFirstLoad = useRef(true);
 
   const handleAntiCheat = useCallback((type: 'visibility' | 'blur') => {
     const msg = type === 'visibility' ? 'Deteksi Perpindahan Tab' : 'Deteksi Keluar Jendela';
@@ -67,6 +70,15 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
         startedAt: new Date(Date.now() - exam.durationMinutes * 60 * 1000), // Approximate start time
         finishedAt: new Date(),
     };
+
+    // Clean up draft after successful submission
+    try {
+      const savedDraftKey = `cbt_exam_draft_${user.id}_${exam.id}`;
+      localStorage.removeItem(savedDraftKey);
+    } catch (e) {
+      console.error("Error cleaning up draft after submission:", e);
+    }
+
     onFinishExam(result);
   }, [exam, answers, onFinishExam, questions, user.id]);
 
@@ -102,7 +114,35 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
         const shuffledQuestions = shuffleArray(data.questions);
         setExam(data.exam);
         setQuestions(shuffledQuestions);
-        setAnswers(shuffledQuestions.map(q => ({ questionId: q.id, answer: '', isDoubtful: false })));
+
+        // Check if there are saved answers in localStorage
+        const savedDraftKey = `cbt_exam_draft_${user.id}_${examId}`;
+        const savedDraftStr = localStorage.getItem(savedDraftKey);
+        let initialAnswers = shuffledQuestions.map(q => ({ questionId: q.id, answer: '', isDoubtful: false }));
+        let restoredSuccess = false;
+
+        if (savedDraftStr) {
+          try {
+            const parsedDraft = JSON.parse(savedDraftStr) as StudentAnswer[];
+            if (Array.isArray(parsedDraft)) {
+              // Map questions to draft answers if they exist
+              initialAnswers = shuffledQuestions.map(q => {
+                const draftAns = parsedDraft.find(da => da.questionId === q.id);
+                return draftAns ? draftAns : { questionId: q.id, answer: '', isDoubtful: false };
+              });
+              restoredSuccess = parsedDraft.some(da => da.answer !== '' || da.isDoubtful);
+            }
+          } catch (e) {
+            console.error("Error parsing saved draft:", e);
+          }
+        }
+
+        setAnswers(initialAnswers);
+        if (restoredSuccess) {
+          setRestoredNotice(true);
+          setTimeout(() => setRestoredNotice(false), 5000);
+        }
+
         setTimeLeft(data.exam.durationMinutes * 60);
         if (data.exam.durationType === 'per-question') {
           setQuestionTimeLeft(data.exam.durationSecondsPerQuestion || 60);
@@ -111,7 +151,29 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
       setIsLoading(false);
     };
     loadExam();
-  }, [examId]);
+  }, [examId, user.id]);
+
+  // Auto-save answers changes to localStorage
+  useEffect(() => {
+    if (exam && answers.length > 0) {
+      try {
+        const savedDraftKey = `cbt_exam_draft_${user.id}_${examId}`;
+        localStorage.setItem(savedDraftKey, JSON.stringify(answers));
+        
+        if (isFirstLoad.current) {
+          isFirstLoad.current = false;
+        } else {
+          setIsSaving(true);
+          const timer = setTimeout(() => {
+            setIsSaving(false);
+          }, 800);
+          return () => clearTimeout(timer);
+        }
+      } catch (e) {
+        console.error("Error saving answers to localStorage:", e);
+      }
+    }
+  }, [answers, exam, examId, user.id]);
 
   useEffect(() => {
     if (timeLeft > 0 && !isLoading) {
@@ -192,6 +254,20 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
             </div>
         )}
 
+        {/* Draft Restored Toast Notification */}
+        {restoredNotice && (
+            <div className="fixed top-10 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="bg-emerald-600 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-500/20 backdrop-blur-xl">
+                    <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                        <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <p className="font-bold text-xs uppercase tracking-widest text-white">Draft Jawaban Berhasil Dipulihkan</p>
+                </div>
+            </div>
+        )}
+
         <div className="flex-grow flex flex-col glass-card border-slate-100 p-10 overflow-hidden">
             <div className="flex-grow overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-slate-200">
                 {currentQuestion && currentAnswer && (
@@ -255,8 +331,14 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
                         ></div>
                     </div>
                 )}
+
+                {/* Auto-Save Status Indicator */}
+                <div className="mt-4 flex items-center justify-center gap-1.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                    <span className={`w-1.5 h-1.5 rounded-full bg-emerald-500 ${isSaving ? 'animate-ping' : ''}`}></span>
+                    <span>{isSaving ? "Menyimpan Draft..." : "Draft Tersimpan Otomatis"}</span>
+                </div>
                 
-                <div className="mt-8 pt-6 border-t border-slate-200/50">
+                <div className="mt-8 pt-6 border-t border-slate-200/50 flex-col">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Integritas</span>
                         <span className={`text-[10px] font-black uppercase ${warnings > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{warnings}/3 Peringatan</span>

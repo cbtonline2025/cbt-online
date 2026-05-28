@@ -3,7 +3,7 @@ import React, { useState, useRef, useMemo, useContext, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
-import { FileText, Video, Music, Edit, Eye, Search, Filter, RefreshCw, Download, CheckCircle2, AlertCircle, HelpCircle, Info, X, Check, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { FileText, Video, Music, Edit, Eye, Search, Filter, RefreshCw, Download, CheckCircle2, AlertCircle, HelpCircle, Info, X, Check, FileSpreadsheet, Trash2, Sparkles } from 'lucide-react';
 import { Question, QuestionType, QuestionOption, QuestionMediaType } from '../../types';
 import { addQuestions, mockQuestions, deleteQuestion, deleteMultipleQuestions } from '../../services/api';
 import Button from '../ui/Button';
@@ -47,7 +47,10 @@ const QuestionBank: React.FC = () => {
 
     // States for Help Guide Modal
     const [showHelpModal, setShowHelpModal] = useState(false);
-    const [activeHelpTab, setActiveHelpTab] = useState<'word' | 'excel' | 'tips'>('word');
+    const [activeHelpTab, setActiveHelpTab] = useState<'word' | 'excel' | 'tips' | 'ai'>('word');
+    
+    // AI assistance active by default
+    const [useAiAssistant, setUseAiAssistant] = useState(true);
 
     // State for importing
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -55,6 +58,7 @@ const QuestionBank: React.FC = () => {
     const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error', text: string, count?: number, fileName?: string } | null>(null);
     const [questions, setQuestions] = useState<Question[]>(mockQuestions);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const pdfFileInputRef = useRef<HTMLInputElement>(null);
 
     // State for manual add
     const [newQuestion, setNewQuestion] = useState({
@@ -92,6 +96,118 @@ const QuestionBank: React.FC = () => {
         if (event.target.files && event.target.files.length > 0) {
             setSelectedFile(event.target.files[0]);
             setImportMessage(null);
+        }
+    };
+
+    const handlePdfFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files && event.target.files.length > 0) {
+            const file = event.target.files[0];
+            if (!file.name.endsWith('.pdf')) {
+                setImportMessage({ type: 'error', text: 'Silakan pilih berkas format PDF untuk konversi AI.' });
+                return;
+            }
+            setSelectedFile(file);
+            setImportMessage(null);
+            setIsParsing(true);
+            
+            try {
+                // Convert PDF to base64
+                const base64Str = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                const requestBody = {
+                    type: 'pdf',
+                    assignedSubject: assignedSubject || undefined,
+                    defaultPhase: 'F',
+                    fileBase64: base64Str
+                };
+
+                const apiRes = await fetch("/api/gemini/parse-exam", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!apiRes.ok) {
+                    const errorData = await apiRes.json();
+                    throw new Error(errorData.error || "Gagal menghubungi Gemini AI di server.");
+                }
+
+                const data = await apiRes.json();
+                if (!data.questions || !Array.isArray(data.questions)) {
+                    throw new Error("Respons AI tidak valid atau tidak menemukan daftar soal dalam format JSON.");
+                }
+
+                // Map parsed AI Questions into strictly conforming Question models
+                const newQuestions = data.questions.map((q: any, index: number) => {
+                    const finalOptions = q.options && q.options.length > 0 
+                        ? q.options.map((opt: any, optIdx: number) => ({
+                            id: `imported-${Date.now()}-${index}-o${optIdx + 1}`,
+                            text: opt.text
+                          }))
+                        : undefined;
+
+                    let correctAnswer = q.correctAnswer;
+                    if (finalOptions && q.correctAnswer) {
+                        // find matching option by text or id to align correctAnswer with the newly generated option ID
+                        const optMatchByText = q.options.find((opt: any) => 
+                            opt.id?.toLowerCase() === q.correctAnswer.toLowerCase() ||
+                            opt.text?.toLowerCase() === q.correctAnswer.toLowerCase()
+                        );
+                        if (optMatchByText) {
+                            const matchIndex = q.options.indexOf(optMatchByText);
+                            correctAnswer = finalOptions[matchIndex].id;
+                        } else {
+                            // Try literal index match (e.g. if correctAnswer is 'a' or 'b')
+                            const letters = ['a', 'b', 'c', 'd', 'e'];
+                            const letterIndex = letters.indexOf(q.correctAnswer.toLowerCase());
+                            if (letterIndex !== -1 && finalOptions[letterIndex]) {
+                                correctAnswer = finalOptions[letterIndex].id;
+                            } else if (finalOptions[0]) {
+                                correctAnswer = finalOptions[0].id;
+                            }
+                        }
+                    }
+
+                    return {
+                        id: `imported-${Date.now()}-${index}`,
+                        content: q.content,
+                        options: finalOptions,
+                        type: q.type === 'Esai' ? QuestionType.ESSAY : QuestionType.MULTIPLE_CHOICE,
+                        mediaType: QuestionMediaType.TEXT,
+                        correctAnswer: correctAnswer || 'Belum terisi',
+                        subject: q.subject || assignedSubject || "Matapelajaran",
+                        phase: q.phase === 'D' || q.phase === 'E' || q.phase === 'F' ? q.phase : 'F'
+                    } as Question;
+                });
+
+                if (newQuestions.length > 0) {
+                    await addQuestions(newQuestions);
+                    setQuestions(prev => [...prev, ...newQuestions]);
+                    setImportMessage({ 
+                        type: 'success', 
+                        text: `Konversi AI Selesai! ${newQuestions.length} soal otomatis terdeteksi & disesuaikan ke format sistem dari PDF Anda.`,
+                        count: newQuestions.length,
+                        fileName: file.name
+                    });
+                } else {
+                    setImportMessage({ type: 'error', text: 'Tidak ada soal yang dapat diimpor dari PDF. Periksa struktur file Anda.' });
+                }
+            } catch (error: any) {
+                setImportMessage({ type: 'error', text: `Gagal mengimpor dari PDF: ${error.message}` });
+            } finally {
+                setIsParsing(false);
+                setSelectedFile(null);
+                if (pdfFileInputRef.current) {
+                    pdfFileInputRef.current.value = '';
+                }
+            }
         }
     };
 
@@ -321,12 +437,115 @@ const QuestionBank: React.FC = () => {
 
         try {
             let newQuestions: Question[] = [];
-            if (selectedFile.name.endsWith('.xlsx')) {
+            const isPdf = selectedFile.name.endsWith('.pdf');
+            const isDocx = selectedFile.name.endsWith('.docx');
+            const isXlsx = selectedFile.name.endsWith('.xlsx');
+
+            if (isXlsx) {
                 newQuestions = await parseXLSX(selectedFile);
-            } else if (selectedFile.name.endsWith('.docx')) {
+            } else if (isPdf || (isDocx && useAiAssistant)) {
+                // Parse using Gemini AI server-side!
+                let requestBody: any = {
+                    type: isPdf ? 'pdf' : 'docx',
+                    assignedSubject: assignedSubject || undefined,
+                    defaultPhase: 'F'
+                };
+
+                if (isPdf) {
+                    // Convert PDF to base64 for native Gemini ingestion
+                    const base64Str = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            const result = reader.result as string;
+                            resolve(result);
+                        };
+                        reader.onerror = reject;
+                        reader.readAsDataURL(selectedFile);
+                    });
+                    requestBody.fileBase64 = base64Str;
+                } else {
+                    // Extract raw text from Word on client-side via mammoth
+                    const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as ArrayBuffer);
+                        reader.onerror = reject;
+                        reader.readAsArrayBuffer(selectedFile);
+                    });
+
+                    const { value: text } = await mammoth.extractRawText({ arrayBuffer });
+                    if (!text || text.trim().length < 10) {
+                        throw new Error("Format teks dalam file Word tidak dapat dibaca atau file kosong. Pastikan file berisi teks soal yang benar.");
+                    }
+                    requestBody.text = text;
+                }
+
+                // Call server side API proxying to @google/genai securely
+                const apiRes = await fetch("/api/gemini/parse-exam", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!apiRes.ok) {
+                    const errorData = await apiRes.json();
+                    throw new Error(errorData.error || "Gagal menghubungi Gemini AI di server.");
+                }
+
+                const data = await apiRes.json();
+                if (!data.questions || !Array.isArray(data.questions)) {
+                    throw new Error("Respons AI tidak valid atau tidak menemukan daftar soal dalam format JSON.");
+                }
+
+                // Map parsed AI Questions into strictly conforming Question models
+                newQuestions = data.questions.map((q: any, index: number) => {
+                    const finalOptions = q.options && q.options.length > 0 
+                        ? q.options.map((opt: any, optIdx: number) => ({
+                            id: `imported-${Date.now()}-${index}-o${optIdx + 1}`,
+                            text: opt.text
+                          }))
+                        : undefined;
+
+                    let correctAnswer = q.correctAnswer;
+                    if (finalOptions && q.correctAnswer) {
+                        // find matching option by text or id to align correctAnswer with the newly generated option ID
+                        const optMatchByText = q.options.find((opt: any) => 
+                            opt.id?.toLowerCase() === q.correctAnswer.toLowerCase() ||
+                            opt.text?.toLowerCase() === q.correctAnswer.toLowerCase()
+                        );
+                        if (optMatchByText) {
+                            const matchIndex = q.options.indexOf(optMatchByText);
+                            correctAnswer = finalOptions[matchIndex].id;
+                        } else {
+                            // Try literal index match (e.g. if correctAnswer is 'a' or 'b')
+                            const letters = ['a', 'b', 'c', 'd', 'e'];
+                            const letterIndex = letters.indexOf(q.correctAnswer.toLowerCase());
+                            if (letterIndex !== -1 && finalOptions[letterIndex]) {
+                                correctAnswer = finalOptions[letterIndex].id;
+                            } else if (finalOptions[0]) {
+                                correctAnswer = finalOptions[0].id;
+                            }
+                        }
+                    }
+
+                    return {
+                        id: `imported-${Date.now()}-${index}`,
+                        content: q.content,
+                        options: finalOptions,
+                        type: q.type === 'Esai' ? QuestionType.ESSAY : QuestionType.MULTIPLE_CHOICE,
+                        mediaType: QuestionMediaType.TEXT,
+                        correctAnswer: correctAnswer || 'Belum terisi',
+                        subject: q.subject || assignedSubject || "Matapelajaran",
+                        phase: q.phase === 'D' || q.phase === 'E' || q.phase === 'F' ? q.phase : 'F'
+                    } as Question;
+                });
+
+            } else if (isDocx) {
+                // Fallback to legacy regex-based parser
                 newQuestions = await parseDOCX(selectedFile);
             } else {
-                throw new Error('Format file tidak didukung. Gunakan .xlsx atau .docx');
+                throw new Error('Format file tidak didukung. Gunakan .xlsx, .docx atau .pdf (dengan bantuan AI)');
             }
 
             if (newQuestions.length > 0) {
@@ -334,7 +553,9 @@ const QuestionBank: React.FC = () => {
                 setQuestions(prev => [...prev, ...newQuestions]);
                 setImportMessage({ 
                     type: 'success', 
-                    text: `Berhasil! ${newQuestions.length} soal baru telah ditambahkan ke bank soal Anda.`,
+                    text: isPdf || (isDocx && useAiAssistant)
+                        ? `Konversi AI Selesai! ${newQuestions.length} soal otomatis terdeteksi & disesuaikan ke format sistem.`
+                        : `Berhasil! ${newQuestions.length} soal baru telah ditambahkan ke bank soal Anda.`,
                     count: newQuestions.length,
                     fileName: selectedFile.name
                 });
@@ -1288,7 +1509,7 @@ const QuestionBank: React.FC = () => {
                                 <span>Panduan Format</span>
                             </button>
                         </div>
-                        <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">Unggah file .docx atau .xlsx untuk menambahkan soal secara massal.</p>
+                        <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">Unggah file .docx, .xlsx, atau .pdf untuk menambahkan soal secara massal.</p>
                         
                         <input 
                             id="file-input" 
@@ -1296,7 +1517,16 @@ const QuestionBank: React.FC = () => {
                             ref={fileInputRef}
                             className="hidden" 
                             onChange={handleFileChange} 
-                            accept=".docx,.xlsx" 
+                            accept=".docx,.xlsx,.pdf" 
+                        />
+                        
+                        <input 
+                            id="pdf-file-input" 
+                            type="file" 
+                            ref={pdfFileInputRef}
+                            className="hidden" 
+                            onChange={handlePdfFileChange} 
+                            accept=".pdf" 
                         />
                         
                         <div className={`p-4 border-2 border-dashed rounded-lg transition-colors ${selectedFile ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30' : 'border-slate-400/50 dark:border-slate-600/50 hover:border-indigo-400'}`}>
@@ -1318,6 +1548,16 @@ const QuestionBank: React.FC = () => {
                                             Pilih Berkas...
                                         </Button>
                                         
+                                        <button 
+                                            type="button"
+                                            onClick={() => pdfFileInputRef.current?.click()}
+                                            className="px-4 py-2.5 text-xs font-bold rounded-lg bg-violet-600 hover:bg-violet-700 dark:bg-violet-700 dark:hover:bg-violet-800 text-white flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+                                            title="Unggah berkas PDF secara instan dan parsing menggunakan bantuan AI Gemini"
+                                        >
+                                            <Sparkles className="w-3.5 h-3.5 text-white animate-pulse" />
+                                            <span>Impor PDF via AI</span>
+                                        </button>
+                                        
                                         <div className="relative group/tooltip">
                                             <button 
                                                 type="button"
@@ -1335,10 +1575,10 @@ const QuestionBank: React.FC = () => {
                                                     <span>Petunjuk Cepat Impor</span>
                                                 </div>
                                                 <p className="text-slate-300 leading-relaxed mb-2 font-medium">
-                                                    Mendukung format <strong className="text-white">Word (.docx)</strong> & <strong className="text-white">Excel (.xlsx)</strong> sesuai template resmi.
+                                                    Mendukung format <strong className="text-white">Word (.docx)</strong>, <strong className="text-white">Excel (.xlsx)</strong>, & <strong className="text-white">PDF (.pdf)</strong>.
                                                 </p>
                                                 <div className="text-[10px] text-slate-400 flex flex-col gap-1 border-t border-slate-800 pt-1.5">
-                                                    <div>• Word: Gunakan nomor urut (contoh: 1., 2.) & tag [SUBJEK: ...]</div>
+                                                    <div>• Word/PDF: Manfaatkan kecerdasan AI untuk format otomatis</div>
                                                     <div>• Excel: Gunakan header kolom lower-case dari template</div>
                                                     <span className="text-indigo-300 font-bold mt-1 inline-block">Klik tombol ini untuk panduan visual interaktif!</span>
                                                 </div>
@@ -1349,6 +1589,33 @@ const QuestionBank: React.FC = () => {
                                 </div>
                             )}
                         </div>
+
+                        {selectedFile && (selectedFile.name.endsWith('.docx') || selectedFile.name.endsWith('.pdf')) && (
+                            <div className="mt-4 p-3 bg-indigo-500/5 dark:bg-indigo-950/20 border border-indigo-500/10 dark:border-indigo-950/40 rounded-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Bantuan AI Gemini</p>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                            {selectedFile.name.endsWith('.pdf') 
+                                                ? "Wajib aktif untuk membaca berkas PDF." 
+                                                : "Format dokumen bebas, dikonversi AI otomatis."}
+                                        </p>
+                                    </div>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer select-none">
+                                    <input 
+                                        type="checkbox" 
+                                        aria-label="Gunakan AI Gemini"
+                                        checked={selectedFile.name.endsWith('.pdf') ? true : useAiAssistant}
+                                        disabled={selectedFile.name.endsWith('.pdf')}
+                                        onChange={(e) => setUseAiAssistant(e.target.checked)}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                                </label>
+                            </div>
+                        )}
 
                         <Button onClick={handleImport} disabled={isParsing || !selectedFile} className="mt-4 w-full flex justify-center items-center gap-2">
                             {isParsing && <Spinner size="small" />}
@@ -2050,10 +2317,10 @@ const QuestionBank: React.FC = () => {
                             </div>
 
                             {/* Modal Sub-Tabs */}
-                            <div className="flex bg-slate-100/60 dark:bg-slate-950/40 p-1 border-b border-slate-100/60 dark:border-slate-850 px-6">
+                            <div className="flex bg-slate-100/60 dark:bg-slate-950/40 p-1 border-b border-slate-100/60 dark:border-slate-850 px-6 overflow-x-auto scrollbar-none">
                                 <button
                                     onClick={() => setActiveHelpTab('word')}
-                                    className={`flex items-center gap-2 py-3 px-4 text-xs font-bold rounded-xl transition-all border-b-2 border-transparent ${
+                                    className={`flex items-center gap-2 py-3 px-4 text-xs font-bold rounded-xl transition-all border-b-2 border-transparent shrink-0 ${
                                         activeHelpTab === 'word'
                                             ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
                                             : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
@@ -2063,8 +2330,19 @@ const QuestionBank: React.FC = () => {
                                     <span>Format Word (.docx)</span>
                                 </button>
                                 <button
+                                    onClick={() => setActiveHelpTab('ai')}
+                                    className={`flex items-center gap-2 py-3 px-4 text-xs font-bold rounded-xl transition-all border-b-2 border-transparent shrink-0 ${
+                                        activeHelpTab === 'ai'
+                                            ? 'bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-400 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+                                    }`}
+                                >
+                                    <Sparkles className="w-4 h-4 text-violet-500 animate-pulse" />
+                                    <span>Asisten AI Gemini (.pdf/.docx)</span>
+                                </button>
+                                <button
                                     onClick={() => setActiveHelpTab('excel')}
-                                    className={`flex items-center gap-2 py-3 px-4 text-xs font-bold rounded-xl transition-all border-b-2 border-transparent ${
+                                    className={`flex items-center gap-2 py-3 px-4 text-xs font-bold rounded-xl transition-all border-b-2 border-transparent shrink-0 ${
                                         activeHelpTab === 'excel'
                                             ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm'
                                             : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
@@ -2075,7 +2353,7 @@ const QuestionBank: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={() => setActiveHelpTab('tips')}
-                                    className={`flex items-center gap-2 py-3 px-4 text-xs font-bold rounded-xl transition-all border-b-2 border-transparent ${
+                                    className={`flex items-center gap-2 py-3 px-4 text-xs font-bold rounded-xl transition-all border-b-2 border-transparent shrink-0 ${
                                         activeHelpTab === 'tips'
                                             ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm'
                                             : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
@@ -2088,6 +2366,69 @@ const QuestionBank: React.FC = () => {
 
                             {/* Modal Body (Scrollable) */}
                             <div className="p-6 overflow-y-auto space-y-6 flex-grow custom-scrollbar text-left">
+                                {activeHelpTab === 'ai' && (
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                        <div className="bg-violet-50/50 dark:bg-violet-950/10 p-4 rounded-2xl border border-violet-150 dark:border-violet-900/40 text-violet-900 dark:text-violet-200 text-xs leading-relaxed">
+                                            <p className="font-extrabold text-violet-700 dark:text-violet-400 mb-1 flex items-center gap-1">
+                                                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                                                <span>Konversi Bertenaga Kecerdasan Buatan (AI Gemini):</span>
+                                            </p>
+                                            Kini Anda dapat mengimpor lembar ujian <strong>tanpa sekat atau penomoran kaku</strong> dalam format <strong>PDF (.pdf)</strong> atau <strong>Word (.docx)</strong>. AI Gemini cerdik membaca struktur dokumen, menyelaraskan bank soal, dan memisahkan kunci jawaban untuk disinkronkan ke format sistem.
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {/* Kemampuan Deteksi */}
+                                            <div className="space-y-3 bg-slate-50 dark:bg-slate-950/50 p-5 rounded-2xl border border-slate-150 dark:border-slate-850">
+                                                <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Kemampuan Deteksi AI:</h4>
+                                                <ul className="space-y-3 text-xs">
+                                                    <li className="flex items-start gap-2.5">
+                                                        <div className="w-5 h-5 rounded-full bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0 mt-0.5">•</div>
+                                                        <div>
+                                                            <strong className="text-slate-900 dark:text-white font-bold">Dokumen Tanpa Format Spesifik:</strong> Buku Latihan Soal, berkas latihan hasil pindaian, soal ujian buatan sendiri, tugas harian, dan naskah ujian lama.
+                                                        </div>
+                                                    </li>
+                                                    <li className="flex items-start gap-2.5">
+                                                        <div className="w-5 h-5 rounded-full bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0 mt-0.5">•</div>
+                                                        <div>
+                                                            <strong className="text-slate-900 dark:text-white font-bold">Pemisahan Soal Ganda & Esai:</strong> AI secara cerdas mendeteksi keberadaan opsi pilihan untuk menentukan jenis soal (Pilihan Ganda atau Esai) secara otomatis.
+                                                        </div>
+                                                    </li>
+                                                    <li className="flex items-start gap-2.5">
+                                                        <div className="w-5 h-5 rounded-full bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0 mt-0.5">•</div>
+                                                        <div>
+                                                            <strong className="text-slate-900 dark:text-white font-bold">Penyelarasan Kunci Jawaban:</strong> AI cerdas mencocokkan kunci jawaban yang diletakkan di akhir dokumen atau di halaman tersendiri dengan pertanyaan yang sesuai.
+                                                        </div>
+                                                    </li>
+                                                </ul>
+                                            </div>
+
+                                            {/* Petunjuk Langkah */}
+                                            <div className="space-y-4">
+                                                <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Cara Penggunaan:</h4>
+                                                <ol className="space-y-2.5 text-xs text-slate-600 dark:text-slate-400">
+                                                    <li className="flex gap-2 font-medium">
+                                                        <span className="text-violet-500 dark:text-violet-400 font-extrabold">1.</span>
+                                                        <span>Pilih atau jatuhkan dokumen <strong>.pdf</strong> atau <strong>.docx</strong> target Anda di panel unggah.</span>
+                                                    </li>
+                                                    <li className="flex gap-2 font-medium">
+                                                        <span className="text-violet-500 dark:text-violet-400 font-extrabold">2.</span>
+                                                        <span>Pastikan saklar <strong>Bantuan AI Gemini</strong> aktif (secara otomatis wajib aktif untuk file PDF).</span>
+                                                    </li>
+                                                    <li className="flex gap-2 font-medium">
+                                                        <span className="text-violet-500 dark:text-violet-400 font-extrabold">3.</span>
+                                                        <span>Klik <strong>Impor Sekarang</strong>. Sistem akan mengirim enkripsi dokumen ke Gemini, mengolah, dan menampilkan ringkasannya dalam hitungan detik.</span>
+                                                    </li>
+                                                </ol>
+                                                
+                                                <div className="mt-4 p-3 bg-amber-500/5 dark:bg-amber-950/20 border border-amber-500/10 dark:border-amber-955/30 text-amber-800 dark:text-amber-300 rounded-xl leading-relaxed text-[11px] font-medium flex gap-2">
+                                                    <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                                    <span><strong>Saran Akurasi:</strong> Pastikan berkas dokumen PDF/Word memiliki format baris teks digital berkualitas tinggi (bukan dokumen hasil foto buram) agar akurasi konversi AI maksimal.</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {activeHelpTab === 'word' && (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
                                         <div className="bg-indigo-50/40 dark:bg-indigo-950/10 p-4 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/30 text-indigo-900 dark:text-indigo-200 text-xs leading-relaxed">
