@@ -1,6 +1,6 @@
 import React from 'react';
 import { Question, QuestionType, QuestionMediaType } from '../../types';
-import { Volume2, Video, Headphones, Info, AlertCircle } from 'lucide-react';
+import { Volume2, Video, Headphones, Info, AlertCircle, ArrowUp, ArrowDown, CheckSquare, Square } from 'lucide-react';
 
 interface QuestionPanelProps {
   question: Question;
@@ -234,6 +234,238 @@ const QuestionPanel: React.FC<QuestionPanelProps> = ({
                         </div>
                     );
                 })}
+            </div>
+        )}
+
+        {question.type === QuestionType.COMPLEX_MULTIPLE_CHOICE && question.options && (
+            <div className="grid grid-cols-1 gap-4">
+                <div className="mb-2 p-3.5 bg-indigo-50-solid bg-indigo-500/5 dark:bg-indigo-950/10 border border-indigo-500/10 dark:border-indigo-950/40 text-indigo-700 dark:text-indigo-400 rounded-2xl text-xs font-bold leading-relaxed flex items-center gap-2">
+                    <Info className="w-4 h-4 shrink-0" />
+                    <span>Pilihan Ganda Kompleks: Anda dapat memilih lebih dari satu jawaban benar.</span>
+                </div>
+                {question.options.map((option, index) => {
+                    const selectedList = currentAnswer ? currentAnswer.split(',') : [];
+                    const isSelected = selectedList.includes(option.id);
+                    const handleToggle = () => {
+                        let newList;
+                        if (isSelected) {
+                            newList = selectedList.filter(id => id !== option.id);
+                        } else {
+                            newList = [...selectedList, option.id];
+                        }
+                        onAnswerChange(question.id, newList.join(','));
+                    };
+                    return (
+                        <div
+                            key={option.id}
+                            onClick={handleToggle}
+                            className={`group flex items-center p-5 rounded-3xl cursor-pointer transition-all duration-300 border-2 ${
+                                isSelected
+                                ? 'bg-indigo-500/10 dark:bg-indigo-950/30 border-indigo-600 dark:border-indigo-550 shadow-xl shadow-indigo-500/5 scale-[1.01]'
+                                : 'bg-white/40 dark:bg-slate-900/30 border-slate-100 dark:border-white/5 hover:border-indigo-200 dark:hover:border-indigo-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 hover:shadow-lg'
+                            }`}
+                        >
+                            <div className={`flex-shrink-0 w-12 h-12 flex items-center justify-center font-black rounded-2xl mr-5 transition-all duration-300 transform group-hover:scale-105 ${
+                                 isSelected 
+                                 ? 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg' 
+                                 : 'bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-950/60 group-hover:text-indigo-600'
+                            }`}>
+                              {optionLetters[index]}
+                            </div>
+                            <div className={`flex-grow font-bold transition-colors text-base ${isSelected ? 'text-indigo-900 dark:text-indigo-200' : 'text-slate-700 dark:text-slate-350'}`}>
+                                {option.text}
+                            </div>
+                            <div className="ml-2">
+                                {isSelected ? (
+                                    <CheckSquare className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                                ) : (
+                                    <Square className="w-6 h-6 text-slate-300 dark:text-slate-600 group-hover:text-indigo-400" />
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        )}
+
+        {question.type === QuestionType.MATCHING && question.matchingPairs && (
+            <div className="space-y-6">
+                <div className="mb-2 p-3.5 bg-indigo-50-solid bg-indigo-500/5 dark:bg-indigo-950/10 border border-indigo-500/10 dark:border-indigo-950/40 text-indigo-700 dark:text-indigo-400 rounded-2xl text-xs font-bold leading-relaxed flex items-center gap-2">
+                    <Info className="w-4 h-4 shrink-0" />
+                    <span>Menjodohkan: Pasangkan deskripsi kiri dengan jawaban yang benar di kanan.</span>
+                </div>
+                
+                {(() => {
+                    let answersObj: Record<string, string> = {};
+                    try {
+                        if (currentAnswer) {
+                            answersObj = JSON.parse(currentAnswer);
+                        }
+                    } catch (_) {}
+                    
+                    const uniqueResponses = Array.from(new Set(question.matchingPairs.map(p => p.response).filter(Boolean)));
+                    
+                    return (
+                        <div className="space-y-4">
+                            {question.matchingPairs.map((pair, index) => {
+                                const matched = answersObj[pair.premise] || "";
+                                const handleSelectResponse = (e: React.ChangeEvent<HTMLSelectElement>) => {
+                                    const newAnswers = { ...answersObj, [pair.premise]: e.target.value };
+                                    onAnswerChange(question.id, JSON.stringify(newAnswers));
+                                };
+                                return (
+                                    <div key={index} className="flex flex-col md:flex-row items-stretch md:items-center p-5 bg-white/40 dark:bg-slate-900/30 rounded-3xl border-2 border-slate-100 dark:border-white/5 gap-4">
+                                        <div className="flex-grow font-bold text-slate-800 dark:text-slate-200 text-sm md:text-base">
+                                            <span className="inline-block bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg text-xs font-black mr-3 text-slate-500 tabular-nums">{index + 1}</span>
+                                            {pair.premise}
+                                        </div>
+                                        <div className="flex items-center gap-3 shrink-0">
+                                            <span className="text-xs font-black text-slate-300 dark:text-slate-650 uppercase tracking-widest hidden md:inline">➔</span>
+                                            <select
+                                                aria-label={`Pilih jawaban untuk ${pair.premise}`}
+                                                value={matched}
+                                                onChange={handleSelectResponse}
+                                                className="w-full md:w-64 bg-white dark:bg-slate-950 border border-slate-205 dark:border-slate-800 rounded-2xl py-3 px-4 font-bold text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                <option value="">-- Pilih Jawaban --</option>
+                                                {uniqueResponses.map((resp, idx) => (
+                                                    <option key={idx} value={resp}>{resp}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+                })()}
+            </div>
+        )}
+
+        {question.type === QuestionType.ORDERING && (question.orderItems || question.options) && (
+            <div className="space-y-6">
+                <div className="mb-2 p-3.5 bg-indigo-50-solid bg-indigo-500/5 dark:bg-indigo-950/10 border border-indigo-500/10 dark:border-indigo-950/40 text-indigo-700 dark:text-indigo-400 rounded-2xl text-xs font-bold leading-relaxed flex items-center gap-2">
+                    <Info className="w-4 h-4 shrink-0" />
+                    <span>Mengurutkan: Susunlah elemen-elemen di bawah ini ke dalam urutan yang tepat dengan tombol panah.</span>
+                </div>
+                
+                {(() => {
+                    const defaultItems = question.orderItems && question.orderItems.length > 0 
+                        ? question.orderItems 
+                        : (question.options?.map(o => o.text) || []);
+                    
+                    let currentList = currentAnswer ? currentAnswer.split(',') : [];
+                    if (currentList.length === 0 || !currentList.every(i => defaultItems.includes(i))) {
+                        currentList = [...defaultItems];
+                    }
+                    
+                    const handleMove = (index: number, direction: 'up' | 'down') => {
+                        const newList = [...currentList];
+                        const targetIdx = direction === 'up' ? index - 1 : index + 1;
+                        if (targetIdx >= 0 && targetIdx < newList.length) {
+                            const temp = newList[index];
+                            newList[index] = newList[targetIdx];
+                            newList[targetIdx] = temp;
+                            onAnswerChange(question.id, newList.join(','));
+                        }
+                    };
+
+                    return (
+                        <div className="space-y-3">
+                            {currentList.map((item, index) => (
+                                <div key={index} className="flex items-center p-4 bg-white/40 dark:bg-slate-900/30 rounded-3xl border-2 border-slate-100 dark:border-white/5 justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-9 h-9 bg-indigo-500/10 text-indigo-600 flex items-center justify-center rounded-xl text-xs font-black italic">{index + 1}</div>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200 text-sm md:text-base">{item}</span>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={index === 0}
+                                            onClick={() => handleMove(index, 'up')}
+                                            className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900 text-slate-600 hover:text-indigo-600 rounded-xl disabled:opacity-30 transition-all cursor-pointer"
+                                            title="Pindahkan ke atas"
+                                        >
+                                            <ArrowUp className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={index === currentList.length - 1}
+                                            onClick={() => handleMove(index, 'down')}
+                                            className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900 text-slate-600 hover:text-indigo-600 rounded-xl disabled:opacity-30 transition-all cursor-pointer"
+                                            title="Pindahkan ke bawah"
+                                        >
+                                            <ArrowDown className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })()}
+            </div>
+        )}
+
+        {question.type === QuestionType.TRUE_FALSE && question.statements && (
+            <div className="space-y-6">
+                <div className="mb-2 p-3.5 bg-indigo-50-solid bg-indigo-500/5 dark:bg-indigo-950/10 border border-indigo-500/10 dark:border-indigo-950/40 text-indigo-700 dark:text-indigo-400 rounded-2xl text-xs font-bold leading-relaxed flex items-center gap-2">
+                    <Info className="w-4 h-4 shrink-0" />
+                    <span>Pernyataan Benar-Salah: Tentukan status kebenaran (Benar / Salah) untuk setiap pernyataan berikut.</span>
+                </div>
+                
+                {(() => {
+                    let answersObj: Record<string, 'Benar' | 'Salah' | ''> = {};
+                    try {
+                        if (currentAnswer) {
+                            answersObj = JSON.parse(currentAnswer);
+                        }
+                    } catch (_) {}
+                    
+                    return (
+                        <div className="space-y-4">
+                            {question.statements.map((statement, index) => {
+                                const selected = answersObj[statement.id] || '';
+                                const handleSelectValue = (val: 'Benar' | 'Salah') => {
+                                    const newAnswers = { ...answersObj, [statement.id]: val };
+                                    onAnswerChange(question.id, JSON.stringify(newAnswers));
+                                };
+                                return (
+                                    <div key={statement.id} className="flex flex-col md:flex-row items-stretch md:items-center p-5 bg-white/40 dark:bg-slate-900/30 rounded-3xl border-2 border-slate-100 dark:border-white/5 gap-4 justify-between">
+                                        <div className="font-bold text-slate-800 dark:text-slate-200 text-sm md:text-base flex-1">
+                                            <span className="inline-block bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg text-xs font-black mr-3 text-slate-500 tabular-nums">{index + 1}</span>
+                                            {statement.text}
+                                        </div>
+                                        <div className="flex gap-2.5 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSelectValue('Benar')}
+                                                className={`flex-1 md:w-28 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all border-2 ${
+                                                    selected === 'Benar'
+                                                    ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xl'
+                                                    : 'bg-white dark:bg-slate-950 border-slate-100 dark:border-white/5 hover:border-emerald-500/30 text-slate-500 dark:text-slate-400 cursor-pointer'
+                                                }`}
+                                            >
+                                                Benar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSelectValue('Salah')}
+                                                className={`flex-1 md:w-28 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all border-2 ${
+                                                    selected === 'Salah'
+                                                    ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500 shadow-xl'
+                                                    : 'bg-white dark:bg-slate-950 border-slate-100 dark:border-white/5 hover:border-rose-500/30 text-slate-500 dark:text-slate-400 cursor-pointer'
+                                                }`}
+                                            >
+                                                Salah
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+                })()}
             </div>
         )}
 

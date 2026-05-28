@@ -38,6 +38,10 @@ export interface User {
 
 export enum QuestionType {
   MULTIPLE_CHOICE = 'Pilihan Ganda',
+  COMPLEX_MULTIPLE_CHOICE = 'Pilihan Ganda Kompleks',
+  MATCHING = 'Menjodohkan',
+  ORDERING = 'Mengurutkan',
+  TRUE_FALSE = 'Pernyataan Benar-Salah',
   ESSAY = 'Esai',
 }
 
@@ -62,6 +66,9 @@ export interface Question {
   correctAnswer: string; // For MC, option id. For Essay, key points.
   phase: 'D' | 'E' | 'F';
   subject: string;
+  matchingPairs?: { premise: string; response: string }[];
+  statements?: { id: string; text: string; correct: boolean }[];
+  orderItems?: string[];
 }
 
 export interface Exam {

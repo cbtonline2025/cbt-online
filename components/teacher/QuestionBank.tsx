@@ -71,6 +71,10 @@ const QuestionBank: React.FC = () => {
         phase: 'F' as 'D' | 'E' | 'F',
         options: [{ text: '' }, { text: '' }, { text: '' }, { text: '' }],
         correctAnswerIndex: 0,
+        correctAnswersList: [0] as number[],
+        matchingPairs: [{ premise: '', response: '' }] as { premise: string; response: string }[],
+        orderItems: ['', ''] as string[],
+        statements: [{ id: 's1', text: '', correct: true }] as { id: string; text: string; correct: boolean }[],
         essayAnswer: ''
     });
 
@@ -175,13 +179,38 @@ const QuestionBank: React.FC = () => {
                         }
                     }
 
+                    let mappedType = QuestionType.MULTIPLE_CHOICE;
+                    if (q.type) {
+                        const tLower = q.type.toLowerCase();
+                        if (tLower.includes('esai') || tLower.includes('essay')) {
+                            mappedType = QuestionType.ESSAY;
+                        } else if (tLower.includes('kompleks') || tLower.includes('complex')) {
+                            mappedType = QuestionType.COMPLEX_MULTIPLE_CHOICE;
+                        } else if (tLower.includes('jodoh') || tLower.includes('match')) {
+                            mappedType = QuestionType.MATCHING;
+                        } else if (tLower.includes('urut') || tLower.includes('order')) {
+                            mappedType = QuestionType.ORDERING;
+                        } else if (tLower.includes('benar') || tLower.includes('salah') || tLower.includes('true') || tLower.includes('false')) {
+                            mappedType = QuestionType.TRUE_FALSE;
+                        }
+                    }
+
+                    const correctAnswersList = Array.isArray(q.correctAnswersList) ? q.correctAnswersList.map(Number) : [];
+                    const matchingPairs = Array.isArray(q.matchingPairs) ? q.matchingPairs : [];
+                    const orderItems = Array.isArray(q.orderItems) ? q.orderItems : [];
+                    const statements = Array.isArray(q.statements) ? q.statements : [];
+
                     return {
                         id: `imported-${Date.now()}-${index}`,
                         content: q.content,
                         options: finalOptions,
-                        type: q.type === 'Esai' ? QuestionType.ESSAY : QuestionType.MULTIPLE_CHOICE,
+                        type: mappedType,
                         mediaType: QuestionMediaType.TEXT,
                         correctAnswer: correctAnswer || 'Belum terisi',
+                        correctAnswersList,
+                        matchingPairs,
+                        orderItems,
+                        statements,
                         subject: q.subject || assignedSubject || "Matapelajaran",
                         phase: q.phase === 'D' || q.phase === 'E' || q.phase === 'F' ? q.phase : 'F'
                     } as Question;
@@ -529,13 +558,38 @@ const QuestionBank: React.FC = () => {
                         }
                     }
 
+                    let mappedType = QuestionType.MULTIPLE_CHOICE;
+                    if (q.type) {
+                        const tLower = q.type.toLowerCase();
+                        if (tLower.includes('esai') || tLower.includes('essay')) {
+                            mappedType = QuestionType.ESSAY;
+                        } else if (tLower.includes('kompleks') || tLower.includes('complex')) {
+                            mappedType = QuestionType.COMPLEX_MULTIPLE_CHOICE;
+                        } else if (tLower.includes('jodoh') || tLower.includes('match')) {
+                            mappedType = QuestionType.MATCHING;
+                        } else if (tLower.includes('urut') || tLower.includes('order')) {
+                            mappedType = QuestionType.ORDERING;
+                        } else if (tLower.includes('benar') || tLower.includes('salah') || tLower.includes('true') || tLower.includes('false')) {
+                            mappedType = QuestionType.TRUE_FALSE;
+                        }
+                    }
+
+                    const correctAnswersList = Array.isArray(q.correctAnswersList) ? q.correctAnswersList.map(Number) : [];
+                    const matchingPairs = Array.isArray(q.matchingPairs) ? q.matchingPairs : [];
+                    const orderItems = Array.isArray(q.orderItems) ? q.orderItems : [];
+                    const statements = Array.isArray(q.statements) ? q.statements : [];
+
                     return {
                         id: `imported-${Date.now()}-${index}`,
                         content: q.content,
                         options: finalOptions,
-                        type: q.type === 'Esai' ? QuestionType.ESSAY : QuestionType.MULTIPLE_CHOICE,
+                        type: mappedType,
                         mediaType: QuestionMediaType.TEXT,
                         correctAnswer: correctAnswer || 'Belum terisi',
+                        correctAnswersList,
+                        matchingPairs,
+                        orderItems,
+                        statements,
                         subject: q.subject || assignedSubject || "Matapelajaran",
                         phase: q.phase === 'D' || q.phase === 'E' || q.phase === 'F' ? q.phase : 'F'
                     } as Question;
@@ -683,7 +737,7 @@ const QuestionBank: React.FC = () => {
                 questionToAdd.promptText = promptText;
             }
 
-            // 2. Type Specific Validation (Pilihan Ganda vs Esai)
+            // 2. Type Specific Validation
             if (newQuestion.type === QuestionType.MULTIPLE_CHOICE) {
                 // Filter non-empty options
                 const validOptions = newQuestion.options.filter(opt => opt.text && opt.text.trim() !== '');
@@ -713,6 +767,81 @@ const QuestionBank: React.FC = () => {
                 }
                 questionToAdd.correctAnswer = finalCorrectOption.id;
 
+            } else if (newQuestion.type === QuestionType.COMPLEX_MULTIPLE_CHOICE) {
+                const validOptions = newQuestion.options.filter(opt => opt.text && opt.text.trim() !== '');
+                if (validOptions.length < 2) {
+                    throw new Error('Pilihan ganda kompleks minimal harus memiliki 2 opsi jawaban yang valid.');
+                }
+
+                if (!newQuestion.correctAnswersList || newQuestion.correctAnswersList.length === 0) {
+                    throw new Error('Pilih minimal satu kunci jawaban yang benar untuk Pilihan Ganda Kompleks.');
+                }
+
+                questionToAdd.options = validOptions.map((opt, i) => ({
+                    id: `${questionToAdd.id}-o${i+1}`,
+                    text: opt.text.trim()
+                }));
+
+                const correctIds: string[] = [];
+                newQuestion.correctAnswersList.forEach(idx => {
+                    const opt = newQuestion.options[idx];
+                    if (opt && opt.text) {
+                        const matchedOpt = questionToAdd.options?.find(o => o.text === opt.text.trim());
+                        if (matchedOpt) {
+                            correctIds.push(matchedOpt.id);
+                        }
+                    }
+                });
+
+                if (correctIds.length === 0) {
+                    throw new Error('Gagal memetakan kunci jawaban. Harap pastikan kunci jawaban yang ditandai sesuai dengan teks opsi.');
+                }
+                questionToAdd.correctAnswer = correctIds.join(',');
+
+            } else if (newQuestion.type === QuestionType.MATCHING) {
+                const validPairs = newQuestion.matchingPairs.filter(p => p.premise.trim() !== '' && p.response.trim() !== '');
+                if (validPairs.length < 1) {
+                    throw new Error('Menjodohkan minimal mempunyai 1 premis dan respon penjodohan yang valid.');
+                }
+
+                questionToAdd.matchingPairs = validPairs.map(p => ({
+                    premise: p.premise.trim(),
+                    response: p.response.trim()
+                }));
+
+                const pairingMap: Record<string, string> = {};
+                validPairs.forEach(p => {
+                    pairingMap[p.premise.trim()] = p.response.trim();
+                });
+                questionToAdd.correctAnswer = JSON.stringify(pairingMap);
+
+            } else if (newQuestion.type === QuestionType.ORDERING) {
+                const validItems = newQuestion.orderItems.map(i => i.trim()).filter(Boolean);
+                if (validItems.length < 2) {
+                    throw new Error('Mengurutkan minimal membutuhkan 2 butir teks yang berurutan.');
+                }
+
+                questionToAdd.orderItems = validItems;
+                questionToAdd.correctAnswer = validItems.join(',');
+
+            } else if (newQuestion.type === QuestionType.TRUE_FALSE) {
+                const validStatements = newQuestion.statements.filter(s => s.text.trim() !== '');
+                if (validStatements.length < 1) {
+                    throw new Error('Pernyataan Benar-Salah membutuhkan minimal 1 baris pernyataan.');
+                }
+
+                questionToAdd.statements = validStatements.map((s, idx) => ({
+                    id: `s${idx+1}`,
+                    text: s.text.trim(),
+                    correct: s.correct
+                }));
+
+                const tfAnswers: Record<string, 'Benar' | 'Salah'> = {};
+                questionToAdd.statements.forEach(s => {
+                    tfAnswers[s.id] = s.correct ? 'Benar' : 'Salah';
+                });
+                questionToAdd.correctAnswer = JSON.stringify(tfAnswers);
+
             } else { // QuestionType.ESSAY
                 const essayAns = (newQuestion.essayAnswer || '').trim();
                 if (!essayAns) {
@@ -738,6 +867,10 @@ const QuestionBank: React.FC = () => {
                 phase: 'F',
                 options: [{ text: '' }, { text: '' }, { text: '' }, { text: '' }],
                 correctAnswerIndex: 0, 
+                correctAnswersList: [0],
+                matchingPairs: [{ premise: '', response: '' }],
+                orderItems: ['', ''],
+                statements: [{ id: 's1', text: '', correct: true }],
                 essayAnswer: ''
             });
             setManualMediaFile(null);
@@ -1962,6 +2095,10 @@ const QuestionBank: React.FC = () => {
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Tipe Soal</label>
                                 <select value={newQuestion.type} onChange={(e) => handleNewQuestionChange('type', e.target.value)} className="w-full bg-white/40 dark:bg-slate-800/50 border border-slate-300/80 dark:border-slate-700/80 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500">
                                     <option value={QuestionType.MULTIPLE_CHOICE}>Pilihan Ganda</option>
+                                    <option value={QuestionType.COMPLEX_MULTIPLE_CHOICE}>Pilihan Ganda Kompleks</option>
+                                    <option value={QuestionType.MATCHING}>Menjodohkan</option>
+                                    <option value={QuestionType.ORDERING}>Mengurutkan</option>
+                                    <option value={QuestionType.TRUE_FALSE}>Pernyataan Benar-Salah</option>
                                     <option value={QuestionType.ESSAY}>Esai</option>
                                 </select>
                            </div>
@@ -2003,6 +2140,266 @@ const QuestionBank: React.FC = () => {
                                 </div>
                             </div>
                         )}
+
+                        {newQuestion.type === QuestionType.COMPLEX_MULTIPLE_CHOICE && (
+                            <div className="pt-4 border-t border-white/20 dark:border-slate-700/50">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h4 className="text-lg font-semibold">Opsi & Kunci Jawaban Kompleks (Centang satu atau lebih)</h4>
+                                    {newQuestion.options.length < 5 && (
+                                        <button 
+                                            type="button" 
+                                            onClick={handleAddOption}
+                                            className="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 flex items-center gap-1 transition-colors"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                                            Tambah Opsi
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="space-y-3">
+                                    {newQuestion.options.map((opt, index) => {
+                                        const isChecked = newQuestion.correctAnswersList.includes(index);
+                                        const handleCheckToggle = () => {
+                                            let newList;
+                                            if (isChecked) {
+                                                newList = newQuestion.correctAnswersList.filter(i => i !== index);
+                                            } else {
+                                                newList = [...newQuestion.correctAnswersList, index];
+                                            }
+                                            handleNewQuestionChange('correctAnswersList', newList);
+                                        };
+                                        return (
+                                            <div key={index} className="flex items-center gap-3">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={isChecked} 
+                                                    onChange={handleCheckToggle} 
+                                                    className="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                />
+                                                <span className="font-semibold text-slate-600 dark:text-slate-300 w-4">{String.fromCharCode(65 + index)}.</span>
+                                                <Input label="" placeholder={`Teks Opsi ${String.fromCharCode(65 + index)}`} value={opt.text} onChange={(e) => handleOptionChange(index, e.target.value)} className="flex-grow !mb-0"/>
+                                                {newQuestion.options.length > 2 && (
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => {
+                                                            handleRemoveOptionManual(index);
+                                                            const adjusted = newQuestion.correctAnswersList
+                                                                .filter(i => i !== index)
+                                                                .map(i => i > index ? i - 1 : i);
+                                                            handleNewQuestionChange('correctAnswersList', adjusted);
+                                                        }}
+                                                        className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                                        title="Hapus Opsi"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {newQuestion.type === QuestionType.MATCHING && (
+                            <div className="pt-4 border-t border-white/20 dark:border-slate-700/50 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <h4 className="text-lg font-semibold">Daftar Pasangan (Premis ➔ Jawaban)</h4>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => {
+                                            const updated = [...newQuestion.matchingPairs, { premise: '', response: '' }];
+                                            handleNewQuestionChange('matchingPairs', updated);
+                                        }}
+                                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 flex items-center gap-1 transition-colors"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                                        Tambah Pasangan
+                                    </button>
+                                </div>
+                                <div className="space-y-3">
+                                    {newQuestion.matchingPairs.map((pair, index) => (
+                                        <div key={index} className="flex flex-col md:flex-row items-center gap-3 bg-slate-500/5 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+                                            <span className="font-bold text-xs text-slate-505 w-6">{index + 1}.</span>
+                                            <div className="flex-1 w-full">
+                                                <input 
+                                                    type="text"
+                                                    placeholder="Lajur Kiri (Premis / Pernyataan)"
+                                                    value={pair.premise}
+                                                    onChange={(e) => {
+                                                        const updated = [...newQuestion.matchingPairs];
+                                                        updated[index].premise = e.target.value;
+                                                        handleNewQuestionChange('matchingPairs', updated);
+                                                    }}
+                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs text-slate-900 dark:text-white"
+                                                 />
+                                             </div>
+                                             <span className="text-slate-400 text-xs font-black">➔</span>
+                                             <div className="flex-1 w-full">
+                                                 <input 
+                                                     type="text"
+                                                     placeholder="Lajur Kanan (Jawaban Pasangan)"
+                                                     value={pair.response}
+                                                     onChange={(e) => {
+                                                         const updated = [...newQuestion.matchingPairs];
+                                                         updated[index].response = e.target.value;
+                                                         handleNewQuestionChange('matchingPairs', updated);
+                                                     }}
+                                                     className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs text-slate-900 dark:text-white"
+                                                 />
+                                             </div>
+                                             {newQuestion.matchingPairs.length > 1 && (
+                                                 <button 
+                                                     type="button"
+                                                     onClick={() => {
+                                                         const updated = newQuestion.matchingPairs.filter((_, i) => i !== index);
+                                                         handleNewQuestionChange('matchingPairs', updated);
+                                                     }}
+                                                     className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                                     title="Hapus baris"
+                                                 >
+                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                 </button>
+                                             )}
+                                         </div>
+                                     ))}
+                                 </div>
+                             </div>
+                         )}
+
+                         {newQuestion.type === QuestionType.ORDERING && (
+                             <div className="pt-4 border-t border-white/20 dark:border-slate-700/50 space-y-4">
+                                 <div className="flex justify-between items-center">
+                                     <h4 className="text-lg font-semibold">Butir Urutan (Masukkan dalam urutan yang BENAR)</h4>
+                                     <button 
+                                         type="button" 
+                                         onClick={() => {
+                                             const updated = [...newQuestion.orderItems, ''];
+                                             handleNewQuestionChange('orderItems', updated);
+                                         }}
+                                         className="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 flex items-center gap-1 transition-colors"
+                                     >
+                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                                         Tambah Butir
+                                     </button>
+                                 </div>
+                                 <div className="space-y-3">
+                                     {newQuestion.orderItems.map((item, index) => (
+                                         <div key={index} className="flex items-center gap-3">
+                                             <span className="font-bold text-xs text-slate-500 w-6 italic">#{index + 1}</span>
+                                             <input 
+                                                 type="text"
+                                                 placeholder={`Urutan ${index+1}`}
+                                                 value={item}
+                                                 onChange={(e) => {
+                                                     const updated = [...newQuestion.orderItems];
+                                                     updated[index] = e.target.value;
+                                                     handleNewQuestionChange('orderItems', updated);
+                                                 }}
+                                                 className="flex-grow bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs text-slate-900 dark:text-white"
+                                             />
+                                             {newQuestion.orderItems.length > 2 && (
+                                                 <button 
+                                                     type="button"
+                                                     onClick={() => {
+                                                         const updated = newQuestion.orderItems.filter((_, i) => i !== index);
+                                                         handleNewQuestionChange('orderItems', updated);
+                                                     }}
+                                                     className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                                 >
+                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                 </button>
+                                             )}
+                                         </div>
+                                     ))}
+                                 </div>
+                             </div>
+                         )}
+
+                         {newQuestion.type === QuestionType.TRUE_FALSE && (
+                             <div className="pt-4 border-t border-white/20 dark:border-slate-700/50 space-y-4">
+                                 <div className="flex justify-between items-center">
+                                     <h4 className="text-lg font-semibold">Tabel Pernyataan Benar-Salah</h4>
+                                     <button 
+                                         type="button" 
+                                         onClick={() => {
+                                             const nextId = `s${newQuestion.statements.length + 1}`;
+                                             const updated = [...newQuestion.statements, { id: nextId, text: '', correct: true }];
+                                             handleNewQuestionChange('statements', updated);
+                                         }}
+                                         className="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 flex items-center gap-1 transition-colors"
+                                     >
+                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                                         Tambah Pernyataan
+                                     </button>
+                                 </div>
+                                 <div className="space-y-3">
+                                     {newQuestion.statements.map((statement, index) => (
+                                         <div key={index} className="flex flex-col md:flex-row items-center gap-3 bg-slate-500/5 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+                                             <span className="font-bold text-xs text-slate-500 w-6">{index + 1}.</span>
+                                             <div className="flex-grow w-full">
+                                                 <input 
+                                                     type="text"
+                                                     placeholder="Isi teks pernyataan..."
+                                                     value={statement.text}
+                                                     onChange={(e) => {
+                                                         const updated = [...newQuestion.statements];
+                                                         updated[index].text = e.target.value;
+                                                         handleNewQuestionChange('statements', updated);
+                                                     }}
+                                                     className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs text-slate-900 dark:text-white"
+                                                 />
+                                             </div>
+                                             <div className="flex items-center gap-2 shrink-0">
+                                                 <button
+                                                     type="button"
+                                                     onClick={() => {
+                                                         const updated = [...newQuestion.statements];
+                                                         updated[index].correct = true;
+                                                         handleNewQuestionChange('statements', updated);
+                                                     }}
+                                                     className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all border ${
+                                                         statement.correct 
+                                                         ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500' 
+                                                         : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500'
+                                                     }`}
+                                                 >
+                                                     Benar
+                                                 </button>
+                                                 <button
+                                                     type="button"
+                                                     onClick={() => {
+                                                         const updated = [...newQuestion.statements];
+                                                         updated[index].correct = false;
+                                                         handleNewQuestionChange('statements', updated);
+                                                     }}
+                                                     className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all border ${
+                                                         !statement.correct 
+                                                         ? 'bg-rose-500/20 text-rose-600 border-rose-500' 
+                                                         : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500'
+                                                     }`}
+                                                 >
+                                                     Salah
+                                                 </button>
+                                             </div>
+                                             {newQuestion.statements.length > 1 && (
+                                                 <button 
+                                                     type="button"
+                                                     onClick={() => {
+                                                         const updated = newQuestion.statements.filter((_, i) => i !== index);
+                                                         const adjusted = updated.map((s, idx) => ({ ...s, id: `s${idx+1}` }));
+                                                         handleNewQuestionChange('statements', adjusted);
+                                                     }}
+                                                     className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                                 >
+                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                 </button>
+                                             )}
+                                         </div>
+                                     ))}
+                                 </div>
+                             </div>
+                         )}
                         {newQuestion.type === QuestionType.ESSAY && (
                             <div className="pt-4 border-t border-white/20 dark:border-slate-700/50">
                                 <h4 className="text-lg font-bold mb-1 text-slate-800 dark:text-white">Kunci Jawaban Esai</h4>
@@ -2211,10 +2608,28 @@ const QuestionBank: React.FC = () => {
                                                     
                                                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg ${
                                                         q.type === QuestionType.MULTIPLE_CHOICE 
-                                                        ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/40' 
-                                                        : 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/40'
+                                                        ? 'text-emerald-605 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-500/10' 
+                                                        : q.type === QuestionType.COMPLEX_MULTIPLE_CHOICE
+                                                        ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 border border-blue-500/10'
+                                                        : q.type === QuestionType.MATCHING
+                                                        ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-500/10'
+                                                        : q.type === QuestionType.ORDERING
+                                                        ? 'text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/20 border border-cyan-500/10'
+                                                        : q.type === QuestionType.TRUE_FALSE
+                                                        ? 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-500/10'
+                                                        : 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 border border-violet-500/10'
                                                     }`}>
-                                                        {q.type === QuestionType.MULTIPLE_CHOICE ? 'Pilihan Ganda' : 'Esai'}
+                                                        {q.type === QuestionType.MULTIPLE_CHOICE 
+                                                            ? 'Pilihan Ganda' 
+                                                            : q.type === QuestionType.COMPLEX_MULTIPLE_CHOICE 
+                                                            ? 'PG Kompleks' 
+                                                            : q.type === QuestionType.MATCHING 
+                                                            ? 'Menjodohkan' 
+                                                            : q.type === QuestionType.ORDERING 
+                                                            ? 'Mengurutkan' 
+                                                            : q.type === QuestionType.TRUE_FALSE 
+                                                            ? 'Benar/Salah' 
+                                                            : 'Esai'}
                                                     </span>
                                                 </div>
                                                 

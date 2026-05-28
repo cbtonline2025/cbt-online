@@ -39,20 +39,34 @@ app.post("/api/gemini/parse-exam", async (req, res) => {
     let systemInstruction = `Anda adalah asisten AI profesional untuk sistem CBT (Computer Based Test) berdasarkan standar BSKAP Kurikulum Merdeka di Indonesia.
 Tugas Anda adalah memproses dokumen ujian (bisa berupa teks mentah atau dokumen PDF) dan mengubahnya secara otomatis menjadi daftar soal yang valid terstruktur dalam JSON.
 
-Aturan Penting Konversi:
-1. Untuk tipe soal "Pilihan Ganda":
-   - Ekstrak seluruh opsi jawaban yang ada.
-   - Tetapkan list of options dengan model: [{ "id": "a", "text": "..." }, { "id": "b", "text": "..." }, ...] menggunakan id beralfabet kecil ("a", "b", "c", "d", "e").
-   - Cari kunci jawaban yang dimaksud di dokumen (biasanya bertanda KUNCI, tebal, tanda *, atau di akhir soal). ` +
-   `Nilai "correctAnswer" harus berupa ID alfabet opsi tersebut (misal "a" atau "b").
-2. Untuk tipe soal "Esai":
+Jenis Ujian / Tipe Soal yang Harus Anda Dukung & Deteksi Secara Otomatis:
+1. "Pilihan Ganda":
+   - Soal pilihan ganda klasik dengan satu jawaban benar.
+   - Tetapkan list of "options" dengan format: [{ "id": "a", "text": "..." }, { "id": "b", "text": "..." }, ...] menggunakan id beralfabet kecil ("a", "b", "c", "d", "e").
+   - Kembalikan "correctAnswer" berupa ID alfabet opsi jawaban tersebut (misal "a" atau "b").
+2. "Pilihan Ganda Kompleks":
+   - Siswa dapat memilih satu atau lebih jawaban benar (multiselect).
+   - Tetapkan list of "options" beralfabet seperti pilihan ganda biasa (A, B, C, D, E).
+   - Tentukan daftar semua kunci jawaban benar dan simpan indeks 0-based di dalam array "correctAnswersList" (misalnya [0, 2] jika jawaban benar adalah A dan C).
+3. "Menjodohkan":
+   - Menghubungkan premis/pernyataan di sisi kiri dengan jawaban yang benar di sisi kanan.
+   - Simpan daftar pasangannya pada array "matchingPairs" berisi objek-objek: { "premise": "Kiri/Soal", "response": "Kanan/Jawaban Pasangannya" }.
+4. "Mengurutkan":
+   - Mengatur serangkaian tahapan, kronologi, atau istilah ke urutan logis yang benar.
+   - Simpan urutan yang BENAR dari atas ke bawah pada array string "orderItems" (misalnya ["Langkah 1", "Langkah 2", "Langkah 3"]).
+5. "Pernyataan Benar-Salah":
+   - Berisi tabel berisi satu atau beberapa sub-pernyataan yang masing-masing harus ditentukan Benar (true) atau Salah (false).
+   - Simpan pada array "statements" berisi entitas: { "id": "s1", "text": "Isi pernyataan", "correct": true/false }.
+6. "Esai":
+   - Pertanyaan esai bebas.
    - Set "options" menjadi kosong atau null.
-   - Kunci jawaban ("correctAnswer") harus berisi petunjuk penskoran atau jawaban esai ideal bagi sistem AI pemeriksa.
-3. Untuk subjek / mata pelajaran ("subject"):
-   - Jika disediakan filter subjek default "${assignedSubject || ''}", gunakan nilai ini untuk memastikan sinkronisasi. Jika tidak, ambil dari konteks teks dokumen ujian secara akurat.
-4. Untuk Fase ("phase"):
-   - Nilai fase harus berupa salah satu dari: "D" (SMP), "E" (SMA Kelas X), "F" (SMA Kelas XI & XII). Jika terdeteksi di luar itu atau tidak jelas, default ke: "${defaultPhase || 'F'}".
-5. Bersikaplah toleran terhadap penomoran yang tidak berurutan, baris baru, atau format file yang berantakan. Tangkap keseluruhan maksud teks soal secara utuh.`;
+   - Isi "correctAnswer" dengan garis besar petunjuk penskoran, kata kunci, atau contoh jawaban ideal untuk bahan koreksi AI.
+
+Aturan Penting Konversi:
+- Tipe soal ("type") pada JSON WAJIB berupa salah satu string dari: "Pilihan Ganda", "Pilihan Ganda Kompleks", "Menjodohkan", "Mengurutkan", "Pernyataan Benar-Salah", atau "Esai".
+- Jika disediakan filter subjek default "${assignedSubject || ''}", gunakan nilai ini untuk properti "subject" guna memastikan konsistensi. Jika tidak, ambil dari dokumen ujian.
+- Nilai"phase" (Fase) harus berupa "D" (SMP), "E" (SMA Kelas X), "F" (SMA Kelas XI/XII). Default ke: "${defaultPhase || 'F'}".
+- Toleransi tinggi terhadap penomoran yang tidak berurutan, tanda baca, tata letak baris baru, atau kesalahan kecil OCR pada dokumen PDF. Tangkap pesan dan substansi soal ujian secara sempurna 100%.`;
 
     let contentParts: any[] = [];
 
@@ -100,11 +114,11 @@ Ekstrak seluruh soal ujian dari teks di atas dan konversikan menjadi format JSON
                 properties: {
                   type: {
                     type: Type.STRING,
-                    description: "Tipe soal, wajib bernilai salah satu dari: 'Pilihan Ganda' atau 'Esai'"
+                    description: "Tipe soal, wajib bernilai salah satu dari: 'Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Menjodohkan', 'Mengurutkan', 'Pernyataan Benar-Salah', atau 'Esai'."
                   },
                   content: {
                     type: Type.STRING,
-                    description: "Pertanyaan atau seluruh teks permasalahan murni"
+                    description: "Teks pertanyaan utama."
                   },
                   options: {
                     type: Type.ARRAY,
@@ -116,11 +130,46 @@ Ekstrak seluruh soal ujian dari teks di atas dan konversikan menjadi format JSON
                       },
                       required: ["id", "text"]
                     },
-                    description: "Daftar opsi jawaban untuk pilihan ganda (kosongkan jika esai)"
+                    description: "Daftar opsi jawaban untuk pilihan ganda / pg kompleks (bisa kosong jika menjodohkan/mengurutkan/pernyataan/esai)."
                   },
                   correctAnswer: {
                     type: Type.STRING,
-                    description: "Kunci jawaban. Jika Pilihan Ganda, wajib berupa ID alfabet dari opsi yang benar (misal 'a'). Jika Esai, isi petunjuk kunci jawaban dan parameter kelayakan skor."
+                    description: "Kunci jawaban default (wajib diisi untuk Pilihan Ganda berupa id opsi, atau untuk Esai berupa pedoman jawaban. Boleh dikosongkan untuk jenis lainnya)."
+                  },
+                  correctAnswersList: {
+                    type: Type.ARRAY,
+                    items: { type: Type.INTEGER },
+                    description: "Daftar indeks opsi benar (0-based, misal [0, 2] untuk opsi A dan C) khusus untuk Pilihan Ganda Kompleks."
+                  },
+                  matchingPairs: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        premise: { type: Type.STRING, description: "Butir pernyataan di lajur kiri" },
+                        response: { type: Type.STRING, description: "Butir jawaban di lajur kanan" }
+                      },
+                      required: ["premise", "response"]
+                    },
+                    description: "Daftar pasangan lajur kiri & kanan khusus tipe soal Menjodohkan."
+                  },
+                  orderItems: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "Daftar butir-butir urutan kronologis yang urutannya sudah BENAR khusus tipe Mengurutkan."
+                  },
+                  statements: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        id: { type: Type.STRING, description: "ID berseri seperti s1, s2, s3" },
+                        text: { type: Type.STRING, description: "Pernyataan yang dinilai" },
+                        correct: { type: Type.BOOLEAN, description: "Penetapan kebenaran pernyataan (true jika Benar, false jika Salah)" }
+                      },
+                      required: ["id", "text", "correct"]
+                    },
+                    description: "Daftar pernyataan Benar/Salah khusus tipe Pernyataan Benar-Salah."
                   },
                   phase: {
                     type: Type.STRING,
@@ -131,7 +180,7 @@ Ekstrak seluruh soal ujian dari teks di atas dan konversikan menjadi format JSON
                     description: "Nama Mapel / Mata Pelajaran, misalnya: Fisika, Matematika"
                   }
                 },
-                required: ["type", "content", "correctAnswer", "phase", "subject"]
+                required: ["type", "content", "phase", "subject"]
               }
             }
           },
