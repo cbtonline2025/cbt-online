@@ -199,6 +199,106 @@ Ekstrak seluruh soal ujian dari teks di atas dan konversikan menjadi format JSON
   }
 });
 
+// Secure Server-side Gemini Essay Analysis API
+app.post("/api/gemini/analyze-essay", async (req, res) => {
+  try {
+    const { studentName, examTitle, questionContent, rubricText, studentAnswer } = req.body;
+
+    if (!questionContent || !rubricText || !studentAnswer) {
+      return res.status(400).json({ error: "Konten pertanyaan, rubrik, dan jawaban siswa wajib diisi." });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ 
+        error: "Konfigurasi API Key (GEMINI_API_KEY) tidak ditemukan di server. Silakan hubungi administrator." 
+      });
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey: apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+
+    const systemInstruction = `Anda adalah seorang asisten korektor ujian profesional berstandar nasional Kurikulum Merdeka Indonesia.
+Tugas Anda adalah menilai secara obyektif dan memberikan umpan balik konstruktif terhadap jawaban esai siswa dengan membandingkannya terhadap kunci jawaban / parameter rubrik penilaian pendidik yang disediakan.
+
+Skor total adalah dari 0 hingga 100. Berikan penilaian objektif pada tiga dimensi:
+1. Pemahaman Konsep (conceptUnderstanding): Skala 0-100, seberapa baik siswa menangkap esensi materi ilmiah/faktual.
+2. Kelengkapan Jawaban (completeness): Skala 0-100, seberapa banyak poin kunci rubrik yang dicakup.
+3. Akurasi Detail (accuracy): Skala 0-100, kebenaran istilah teknis atau argumen tanpa miskonsepsi.
+
+Hitung skor akhir rata-rata (score) secara logis berbasis ketiga parameter tersebut.
+Tuliskan juga:
+- Kekuatan/Kelebihan utama (strengths): Daftar string poin keunggulan jawaban siswa.
+- Kekurangan/Celah (weaknesses): Daftar string apa yang kurang atau salah dari jawaban siswa.
+- Saran Konstruktif (constructiveFeedback): Kalimat motivatif dalam bahasa Indonesia santun yang mengarahkan siswa mencapai pemahaman sempurna.
+
+Bersikaplah adil, suportif, dan edukatif. Jika siswa menjawab kosong atau tidak nyambung, beri nilai rendah. Jika jawaban mendekati rubrik tetapi menggunakan bahasa sendiri, hargai usahanya dan beri nilai sepantasnya.`;
+
+    const prompt = `Analisis Hasil Jawaban Esai Siswa berikut:
+- Nama Siswa: ${studentName || "Siswa"}
+- Ujian: ${examTitle || "Ujian Esai"}
+- Pertanyaan: "${questionContent}"
+- Kunci Jawaban / Rubrik Pendidik: "${rubricText}"
+- Jawaban Siswa: "${studentAnswer}"`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            score: { 
+              type: Type.INTEGER, 
+              description: "Skor akhir keseluruhan antara 0 sampai 100."
+            },
+            scoresDetail: {
+              type: Type.OBJECT,
+              properties: {
+                conceptUnderstanding: { type: Type.INTEGER, description: "Skor Pemahaman Konsep (0-100)" },
+                completeness: { type: Type.INTEGER, description: "Skor Kelengkapan Jawaban (0-100)" },
+                accuracy: { type: Type.INTEGER, description: "Skor Akurasi Detail (0-100)" }
+              },
+              required: ["conceptUnderstanding", "completeness", "accuracy"]
+            },
+            strengths: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Daftar poin-poin penting yang dijawab secara benar oleh siswa."
+            },
+            weaknesses: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Daftar poin-poin yang kurang tepat, keliru, atau terlewatkan dibanding rubrik."
+            },
+            constructiveFeedback: {
+              type: Type.STRING,
+              description: "Ulasan perbaikan yang ramah, memotivasi, dan mendalam bagi siswa dalam Bahasa Indonesia."
+            }
+          },
+          required: ["score", "scoresDetail", "strengths", "weaknesses", "constructiveFeedback"]
+        }
+      }
+    });
+
+    const parsedData = JSON.parse(response.text || "{}");
+    res.json(parsedData);
+  } catch (error: any) {
+    console.error("Kesalahan saat menganalisis esai via Gemini AI:", error);
+    res.status(500).json({ 
+      error: "Gagal menganalisis jawaban esai menggunakan Gemini AI: " + (error.message || error) 
+    });
+  }
+});
+
 // Vite Middleware & Static Assets Handler
 async function bootstrap() {
   if (process.env.NODE_ENV !== "production") {
@@ -210,7 +310,7 @@ async function bootstrap() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*all', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

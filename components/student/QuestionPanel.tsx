@@ -1,6 +1,6 @@
 import React from 'react';
 import { Question, QuestionType, QuestionMediaType } from '../../types';
-import { Volume2, Video, Headphones, Info, AlertCircle, ArrowUp, ArrowDown, CheckSquare, Square } from 'lucide-react';
+import { Volume2, Video, Headphones, Info, AlertCircle, ArrowUp, ArrowDown, CheckSquare, Square, Play, Pause, VolumeX, RotateCcw } from 'lucide-react';
 
 interface QuestionPanelProps {
   question: Question;
@@ -47,6 +47,362 @@ const getEmbedUrl = (url: string): string | null => {
     return trimmedUrl;
 };
 
+const CustomAudioPlayer: React.FC<{ src: string; questionId: string }> = ({ src, questionId }) => {
+    const audioRef = React.useRef<HTMLAudioElement | null>(null);
+    const [isPlaying, setIsPlaying] = React.useState(false);
+    const [currentTime, setCurrentTime] = React.useState(0);
+    const [duration, setDuration] = React.useState(0);
+    const [volume, setVolume] = React.useState(1);
+    const [isMuted, setIsMuted] = React.useState(false);
+
+    const togglePlay = () => {
+        if (!audioRef.current) return;
+        if (isPlaying) {
+            audioRef.current.pause();
+            setIsPlaying(false);
+        } else {
+            audioRef.current.play().then(() => {
+                setIsPlaying(true);
+            }).catch(err => console.error("Error playing audio:", err));
+        }
+    };
+
+    const handleTimeUpdate = () => {
+        if (audioRef.current) {
+            setCurrentTime(audioRef.current.currentTime);
+        }
+    };
+
+    const handleLoadedMetadata = () => {
+        if (audioRef.current) {
+            setDuration(audioRef.current.duration);
+        }
+    };
+
+    const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!audioRef.current || duration === 0) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const width = rect.width;
+        const percentage = Math.max(0, Math.min(1, clickX / width));
+        audioRef.current.currentTime = percentage * duration;
+        setCurrentTime(percentage * duration);
+    };
+
+    const handleVolumeToggle = () => {
+        if (!audioRef.current) return;
+        const newMuted = !isMuted;
+        setIsMuted(newMuted);
+        audioRef.current.muted = newMuted;
+    };
+
+    const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!audioRef.current) return;
+        const newVol = parseFloat(e.target.value);
+        setVolume(newVol);
+        setIsMuted(newVol === 0);
+        audioRef.current.volume = newVol;
+        audioRef.current.muted = newVol === 0;
+    };
+
+    const handleRestart = () => {
+        if (!audioRef.current) return;
+        audioRef.current.currentTime = 0;
+        setCurrentTime(0);
+        audioRef.current.play().then(() => {
+            setIsPlaying(true);
+        });
+    };
+
+    const formatTime = (secs: number) => {
+        if (isNaN(secs)) return '0:00';
+        const minutes = Math.floor(secs / 60);
+        const seconds = Math.floor(secs % 60);
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+    const boundedPercent = Math.min(100, progressPercent);
+
+    return (
+        <div className="my-6 bg-gradient-to-br from-indigo-500/5 to-fuchsia-500/5 dark:from-indigo-550/10 dark:to-fuchsia-550/10 p-6 rounded-3xl border-2 border-white/60 dark:border-white/10 shadow-lg backdrop-blur-xl flex flex-col md:flex-row items-center gap-6 relative overflow-hidden group">
+            <audio 
+                ref={audioRef}
+                src={src}
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onEnded={() => setIsPlaying(false)}
+                key={questionId}
+                className="hidden"
+            />
+
+            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-700 -z-10"></div>
+            
+            <div className="p-4 bg-gradient-to-br from-indigo-600 to-fuchsia-600 rounded-2xl text-white shadow-lg shadow-indigo-500/25 shrink-0 transition-transform duration-300 group-hover:scale-105">
+                <Headphones className="w-8 h-8" />
+            </div>
+
+            <div className="flex-grow w-full space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest bg-indigo-500/10 dark:bg-indigo-500/20 px-3.5 py-1 rounded-full border border-indigo-500/20">Pemutar Audio Interaktif</span>
+                        <h4 className="font-extrabold text-sm text-slate-800 dark:text-slate-200 mt-2">Dengarkan klip audio materi dengan bilah pelacakan di bawah ini.</h4>
+                    </div>
+                    <div className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl self-start sm:self-auto">
+                        {formatTime(currentTime)} <span className="text-slate-300 dark:text-slate-650">/</span> {formatTime(duration)}
+                    </div>
+                </div>
+
+                {/* Custom Progress Bar Indicator */}
+                <div className="space-y-2">
+                    <div 
+                        onClick={handleProgressClick}
+                        className="relative w-full h-3 bg-slate-200 dark:bg-slate-800 rounded-full cursor-pointer overflow-hidden transition-all duration-300 hover:h-4"
+                    >
+                        <div 
+                            style={{ width: `${boundedPercent}%` }}
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-indigo-500 via-indigo-600 to-fuchsia-650 rounded-full transition-all duration-100"
+                        />
+                        <div 
+                            style={{ left: `${boundedPercent}%` }}
+                            className="absolute top-0 -translate-x-1/2 w-1 h-full bg-white opacity-90 pointer-events-none"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={togglePlay}
+                            className="w-11 h-11 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition hover:scale-105 active:scale-95 shadow-lg shadow-indigo-600/20 cursor-pointer"
+                            title={isPlaying ? "Jeda" : "Putar"}
+                        >
+                            {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleRestart}
+                            className="w-11 h-11 flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-705 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-2xl transition hover:scale-105 cursor-pointer"
+                            title="Mulai Ulang"
+                        >
+                            <RotateCcw className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2.5">
+                        <button
+                            type="button"
+                            onClick={handleVolumeToggle}
+                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl transition cursor-pointer"
+                            title={isMuted ? "Suarakan" : "Senyapkan"}
+                        >
+                            {isMuted ? <VolumeX className="w-4 h-4 text-rose-500" /> : <Volume2 className="w-4 h-4" />}
+                        </button>
+                        <input 
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={isMuted ? 0 : volume}
+                            onChange={handleVolumeChange}
+                            className="w-20 md:w-28 accent-indigo-600 bg-slate-200 dark:bg-slate-800 h-1.5 rounded-lg cursor-pointer"
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const CustomVideoPlayer: React.FC<{ src: string; questionId: string }> = ({ src, questionId }) => {
+    const videoRef = React.useRef<HTMLVideoElement | null>(null);
+    const containerRef = React.useRef<HTMLDivElement | null>(null);
+    const [isPlaying, setIsPlaying] = React.useState(false);
+    const [currentTime, setCurrentTime] = React.useState(0);
+    const [duration, setDuration] = React.useState(0);
+    const [volume, setVolume] = React.useState(1);
+    const [isMuted, setIsMuted] = React.useState(false);
+    const [showControls, setShowControls] = React.useState(true);
+
+    React.useEffect(() => {
+        let timeout: any;
+        if (isPlaying) {
+            timeout = setTimeout(() => {
+                setShowControls(false);
+            }, 3000);
+        } else {
+            setShowControls(true);
+        }
+        return () => clearTimeout(timeout);
+    }, [isPlaying, currentTime]);
+
+    const handleMouseMove = () => {
+        setShowControls(true);
+    };
+
+    const togglePlay = () => {
+        if (!videoRef.current) return;
+        if (isPlaying) {
+            videoRef.current.pause();
+            setIsPlaying(false);
+        } else {
+            videoRef.current.play().then(() => {
+                setIsPlaying(true);
+            }).catch(err => console.error("Error playing video:", err));
+        }
+    };
+
+    const handleTimeUpdate = () => {
+        if (videoRef.current) {
+            setCurrentTime(videoRef.current.currentTime);
+        }
+    };
+
+    const handleLoadedMetadata = () => {
+        if (videoRef.current) {
+            setDuration(videoRef.current.duration);
+        }
+    };
+
+    const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!videoRef.current || duration === 0) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const width = rect.width;
+        const percentage = Math.max(0, Math.min(1, clickX / width));
+        videoRef.current.currentTime = percentage * duration;
+        setCurrentTime(percentage * duration);
+    };
+
+    const handleVolumeToggle = () => {
+        if (!videoRef.current) return;
+        const newMuted = !isMuted;
+        setIsMuted(newMuted);
+        videoRef.current.muted = newMuted;
+    };
+
+    const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!videoRef.current) return;
+        const newVol = parseFloat(e.target.value);
+        setVolume(newVol);
+        setIsMuted(newVol === 0);
+        videoRef.current.volume = newVol;
+        videoRef.current.muted = newVol === 0;
+    };
+
+    const handleRestart = () => {
+        if (!videoRef.current) return;
+        videoRef.current.currentTime = 0;
+        setCurrentTime(0);
+        videoRef.current.play().then(() => {
+            setIsPlaying(true);
+        });
+    };
+
+    const formatTime = (secs: number) => {
+        if (isNaN(secs)) return '0:00';
+        const minutes = Math.floor(secs / 60);
+        const seconds = Math.floor(secs % 60);
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+    const boundedPercent = Math.min(100, progressPercent);
+
+    return (
+        <div 
+            ref={containerRef}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => isPlaying && setShowControls(false)}
+            className="my-6 w-full aspect-video bg-slate-950 dark:bg-black rounded-3xl shadow-2xl overflow-hidden border-2 border-white/60 dark:border-white/10 relative group/video"
+        >
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-indigo-600 to-rose-500 z-20"></div>
+
+            <video 
+                ref={videoRef}
+                src={src}
+                onClick={togglePlay}
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onEnded={() => setIsPlaying(false)}
+                className="w-full h-full object-contain cursor-pointer relative z-10"
+                key={questionId}
+            />
+
+            <div className={`absolute bottom-0 left-0 w-full bg-gradient-to-t from-slate-950/90 via-slate-950/70 to-transparent p-5 pt-10 z-20 transition-all duration-300 flex flex-col gap-4 ${
+                showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+            }`}>
+                <div className="space-y-1">
+                    <div 
+                        onClick={handleProgressClick}
+                        className="relative w-full h-2 bg-white/20 hover:bg-white/30 rounded-full cursor-pointer overflow-hidden transition-all duration-300 hover:h-3"
+                    >
+                        <div 
+                            style={{ width: `${boundedPercent}%` }}
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-indigo-550 to-rose-500 rounded-full"
+                        />
+                        <div 
+                            style={{ left: `${boundedPercent}%` }}
+                            className="absolute top-0 -translate-x-1/2 w-1 h-full bg-white opacity-90 pointer-events-none"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={togglePlay}
+                            className="w-10 h-10 flex items-center justify-center bg-white text-slate-950 rounded-xl transition hover:scale-105 active:scale-95 shadow-md cursor-pointer"
+                            title={isPlaying ? "Jeda" : "Putar"}
+                        >
+                            {isPlaying ? <Pause className="w-4 h-4 fill-current text-slate-950" /> : <Play className="w-4 h-4 fill-current text-slate-950 ml-0.5" />}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleRestart}
+                            className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/10 transition hover:scale-105 cursor-pointer"
+                            title="Mulai Ulang"
+                        >
+                            <RotateCcw className="w-3.5 h-3.5 text-white" />
+                        </button>
+
+                        <div className="text-xs font-mono font-bold text-white/95 px-2 py-1">
+                            {formatTime(currentTime)} <span className="text-white/40">/</span> {formatTime(duration)}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleVolumeToggle}
+                            className="p-1.5 hover:bg-white/10 text-white rounded-lg transition shrink-0 cursor-pointer"
+                        >
+                            {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-white" />}
+                        </button>
+                        <input 
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={isMuted ? 0 : volume}
+                            onChange={handleVolumeChange}
+                            className="w-16 md:w-24 accent-white bg-white/20 h-1 rounded-lg cursor-pointer"
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const MediaRenderer: React.FC<{ question: Question }> = ({ question }) => {
     const mediaType = question.mediaType || QuestionMediaType.TEXT;
     const content = question.content;
@@ -91,53 +447,24 @@ const MediaRenderer: React.FC<{ question: Question }> = ({ question }) => {
                 </div>
             );
         }
-        return (
-            <div className="my-6 bg-gradient-to-br from-indigo-500/5 to-fuchsia-500/5 dark:from-indigo-550/10 dark:to-fuchsia-550/10 p-6 rounded-3xl border-2 border-white/60 dark:border-white/10 shadow-lg backdrop-blur-xl flex flex-col md:flex-row items-center gap-6 relative overflow-hidden group">
-                 {/* Decorative background glow */}
-                 <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-700 -z-10"></div>
-                 
-                 <div className="p-4 bg-gradient-to-br from-indigo-600 to-fuchsia-600 rounded-2xl text-white shadow-lg shadow-indigo-500/25 shrink-0 animate-pulse">
-                     <Headphones className="w-8 h-8" />
-                 </div>
-                 
-                 <div className="flex-grow w-full space-y-3">
-                     <div>
-                         <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest bg-indigo-500/10 dark:bg-indigo-500/20 px-3.5 py-1.5 rounded-full border border-indigo-500/20">Pemutar Audio Soal</span>
-                         <h4 className="font-extrabold text-sm text-slate-800 dark:text-slate-200 mt-2.5">Klik tombol putar untuk mendengarkan audio atau instruksi pengerjaan soal.</h4>
-                     </div>
-                     <audio controls className="w-full rounded-2xl outline-none" key={question.id}>
-                        <source src={embedUrl || undefined} />
-                        Browser Anda tidak mendukung elemen audio.
-                    </audio>
-                 </div>
-            </div>
-        );
+        return <CustomAudioPlayer src={embedUrl || ''} questionId={question.id} />;
     }
 
     if (mediaType === QuestionMediaType.VIDEO) {
-        return (
+        return (isYouTube || isDrive) ? (
             <div className="my-6 w-full aspect-video bg-slate-950 dark:bg-black rounded-3xl shadow-2xl overflow-hidden border-2 border-white/60 dark:border-white/10 relative group/video">
                 <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 to-rose-500 z-20"></div>
-                {(isYouTube || isDrive) ? (
-                    <iframe
-                        src={embedUrl || undefined}
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        title={`Video Content - ${question.id}`}
-                        className="w-full h-full relative z-10"
-                    ></iframe>
-                ) : (
-                    <video 
-                        src={embedUrl || undefined} 
-                        controls 
-                        className="w-full h-full relative z-10"
-                        key={question.id}
-                    >
-                        Browser Anda tidak mendukung elemen video.
-                    </video>
-                )}
+                <iframe
+                    src={embedUrl || undefined}
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title={`Video Content - ${question.id}`}
+                    className="w-full h-full relative z-10"
+                ></iframe>
             </div>
+        ) : (
+            <CustomVideoPlayer src={embedUrl || ''} questionId={question.id} />
         );
     }
     
