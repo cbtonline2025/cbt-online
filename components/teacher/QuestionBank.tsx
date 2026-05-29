@@ -139,8 +139,24 @@ const QuestionBank: React.FC = () => {
                 });
 
                 if (!apiRes.ok) {
-                    const errorData = await apiRes.json();
-                    throw new Error(errorData.error || "Gagal menghubungi Gemini AI di server.");
+                    let errorMessage = "Gagal menghubungi Gemini AI di server.";
+                    try {
+                        const errorData = await apiRes.json();
+                        errorMessage = errorData.error || errorMessage;
+                    } catch (jsonErr) {
+                        try {
+                            const errorText = await apiRes.text();
+                            if (errorText) {
+                                if (errorText.includes("Too Large") || apiRes.status === 413) {
+                                    errorMessage = "Ukuran berkas PDF terlalu besar untuk diproses. Silakan gunakan berkas PDF yang lebih kecil (di bawah 5MB).";
+                                } else {
+                                    errorMessage = `Kesalahan Server (${apiRes.status}): ` + 
+                                        (errorText.length > 150 ? errorText.substring(0, 150) + "..." : errorText);
+                                }
+                            }
+                        } catch (_) {}
+                    }
+                    throw new Error(errorMessage);
                 }
 
                 const data = await apiRes.json();
@@ -518,8 +534,24 @@ const QuestionBank: React.FC = () => {
                 });
 
                 if (!apiRes.ok) {
-                    const errorData = await apiRes.json();
-                    throw new Error(errorData.error || "Gagal menghubungi Gemini AI di server.");
+                    let errorMessage = "Gagal menghubungi Gemini AI di server.";
+                    try {
+                        const errorData = await apiRes.json();
+                        errorMessage = errorData.error || errorMessage;
+                    } catch (jsonErr) {
+                        try {
+                            const errorText = await apiRes.text();
+                            if (errorText) {
+                                if (errorText.includes("Too Large") || apiRes.status === 413) {
+                                    errorMessage = "Ukuran berkas PDF/Word terlalu besar untuk diproses. Silakan gunakan berkas yang lebih kecil (di bawah 5MB).";
+                                } else {
+                                    errorMessage = `Kesalahan Server (${apiRes.status}): ` + 
+                                        (errorText.length > 150 ? errorText.substring(0, 150) + "..." : errorText);
+                                }
+                            }
+                        } catch (_) {}
+                    }
+                    throw new Error(errorMessage);
                 }
 
                 const data = await apiRes.json();

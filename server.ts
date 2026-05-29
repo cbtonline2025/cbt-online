@@ -75,8 +75,8 @@ Aturan Penting Konversi:
         return res.status(400).json({ error: "File base64 PDF wajib dikirimkan." });
       }
       
-      // Clean up base64 prefix if exists
-      const cleanBase64 = fileBase64.replace(/^data:application\/pdf;base64,/, "");
+      // Clean up any base64 prefix if exists
+      const cleanBase64 = fileBase64.replace(/^data:[^;]+;base64,/, "");
 
       contentParts.push({
         inlineData: {
@@ -100,7 +100,7 @@ Ekstrak seluruh soal ujian dari teks di atas dan konversikan menjadi format JSON
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
-      contents: contentParts,
+      contents: { parts: contentParts },
       config: {
         systemInstruction: systemInstruction,
         responseMimeType: "application/json",
@@ -189,7 +189,12 @@ Ekstrak seluruh soal ujian dari teks di atas dan konversikan menjadi format JSON
       }
     });
 
-    const parsedData = JSON.parse(response.text || "{}");
+    let cleanJson = response.text || "{}";
+    const trimJson = cleanJson.trim();
+    if (trimJson.startsWith("```")) {
+      cleanJson = trimJson.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
+    }
+    const parsedData = JSON.parse(cleanJson);
     res.json(parsedData);
   } catch (error: any) {
     console.error("Kesalahan saat memproses file ujian via Gemini AI:", error);
@@ -289,7 +294,12 @@ Bersikaplah adil, suportif, dan edukatif. Jika siswa menjawab kosong atau tidak 
       }
     });
 
-    const parsedData = JSON.parse(response.text || "{}");
+    let cleanJson = response.text || "{}";
+    const trimJson = cleanJson.trim();
+    if (trimJson.startsWith("```")) {
+      cleanJson = trimJson.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
+    }
+    const parsedData = JSON.parse(cleanJson);
     res.json(parsedData);
   } catch (error: any) {
     console.error("Kesalahan saat menganalisis esai via Gemini AI:", error);
