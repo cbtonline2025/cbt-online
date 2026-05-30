@@ -138,29 +138,40 @@ const QuestionBank: React.FC = () => {
                     body: JSON.stringify(requestBody)
                 });
 
+                let data: any;
                 if (!apiRes.ok) {
                     let errorMessage = "Gagal menghubungi Gemini AI di server.";
                     try {
-                        const errorData = await apiRes.json();
-                        errorMessage = errorData.error || errorMessage;
-                    } catch (jsonErr) {
+                        const rawText = await apiRes.text();
                         try {
-                            const errorText = await apiRes.text();
-                            if (errorText) {
-                                if (errorText.includes("Too Large") || apiRes.status === 413) {
+                            const errorData = JSON.parse(rawText);
+                            errorMessage = errorData.error || errorMessage;
+                        } catch (jsonErr) {
+                            if (rawText) {
+                                if (rawText.includes("Too Large") || apiRes.status === 413) {
                                     errorMessage = "Ukuran berkas PDF terlalu besar untuk diproses. Silakan gunakan berkas PDF yang lebih kecil (di bawah 5MB).";
                                 } else {
                                     errorMessage = `Kesalahan Server (${apiRes.status}): ` + 
-                                        (errorText.length > 150 ? errorText.substring(0, 150) + "..." : errorText);
+                                        (rawText.length > 150 ? rawText.substring(0, 150) + "..." : rawText);
                                 }
+                            } else {
+                                errorMessage = `Kesalahan Server (${apiRes.status})`;
                             }
-                        } catch (_) {}
+                        }
+                    } catch (_) {
+                        errorMessage = `Kesalahan Server (${apiRes.status})`;
                     }
                     throw new Error(errorMessage);
                 }
 
-                const data = await apiRes.json();
-                if (!data.questions || !Array.isArray(data.questions)) {
+                try {
+                    const rawText = await apiRes.text();
+                    data = JSON.parse(rawText);
+                } catch (jsonErr: any) {
+                    throw new Error("Server mengirimkan respons yang tidak valid (bukan JSON). Hubungi administrator apabila integrasi API Vercel bermasalah.");
+                }
+
+                if (!data || !data.questions || !Array.isArray(data.questions)) {
                     throw new Error("Respons AI tidak valid atau tidak menemukan daftar soal dalam format JSON.");
                 }
 
@@ -533,29 +544,40 @@ const QuestionBank: React.FC = () => {
                     body: JSON.stringify(requestBody)
                 });
 
+                let data: any;
                 if (!apiRes.ok) {
                     let errorMessage = "Gagal menghubungi Gemini AI di server.";
                     try {
-                        const errorData = await apiRes.json();
-                        errorMessage = errorData.error || errorMessage;
-                    } catch (jsonErr) {
+                        const rawText = await apiRes.text();
                         try {
-                            const errorText = await apiRes.text();
-                            if (errorText) {
-                                if (errorText.includes("Too Large") || apiRes.status === 413) {
+                            const errorData = JSON.parse(rawText);
+                            errorMessage = errorData.error || errorMessage;
+                        } catch (jsonErr) {
+                            if (rawText) {
+                                if (rawText.includes("Too Large") || apiRes.status === 413) {
                                     errorMessage = "Ukuran berkas PDF/Word terlalu besar untuk diproses. Silakan gunakan berkas yang lebih kecil (di bawah 5MB).";
                                 } else {
                                     errorMessage = `Kesalahan Server (${apiRes.status}): ` + 
-                                        (errorText.length > 150 ? errorText.substring(0, 150) + "..." : errorText);
+                                        (rawText.length > 150 ? rawText.substring(0, 150) + "..." : rawText);
                                 }
+                            } else {
+                                errorMessage = `Kesalahan Server (${apiRes.status})`;
                             }
-                        } catch (_) {}
+                        }
+                    } catch (_) {
+                        errorMessage = `Kesalahan Server (${apiRes.status})`;
                     }
                     throw new Error(errorMessage);
                 }
 
-                const data = await apiRes.json();
-                if (!data.questions || !Array.isArray(data.questions)) {
+                try {
+                    const rawText = await apiRes.text();
+                    data = JSON.parse(rawText);
+                } catch (jsonErr: any) {
+                    throw new Error("Server mengirimkan respons yang tidak valid (bukan JSON). Hubungi administrator apabila integrasi API Vercel bermasalah.");
+                }
+
+                if (!data || !data.questions || !Array.isArray(data.questions)) {
                     throw new Error("Respons AI tidak valid atau tidak menemukan daftar soal dalam format JSON.");
                 }
 

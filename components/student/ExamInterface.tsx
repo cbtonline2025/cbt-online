@@ -7,7 +7,7 @@ import QuestionPanel from './QuestionPanel';
 import NavigationPanel from './NavigationPanel';
 import Button from '../ui/Button';
 import { useAntiCheat } from '../../hooks/useAntiCheat';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ShieldAlert } from 'lucide-react';
 
 interface ExamInterfaceProps {
   examId: string;
@@ -29,12 +29,16 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [restoredNotice, setRestoredNotice] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showViolationModal, setShowViolationModal] = useState(false);
+  const [latestViolationType, setLatestViolationType] = useState<'visibility' | 'blur' | null>(null);
   const isFirstLoad = useRef(true);
 
   const handleAntiCheat = useCallback((type: 'visibility' | 'blur') => {
     const msg = type === 'visibility' ? 'Deteksi Perpindahan Tab' : 'Deteksi Keluar Jendela';
     console.warn(`[ANTI-CHEAT LOG] Pelanggaran terdeteksi: ${msg} pada ${new Date().toLocaleTimeString()}`);
     setViolationMessage(`Peringatan: Jangan meninggalkan halaman ujian! (${msg})`);
+    setLatestViolationType(type);
+    setShowViolationModal(true);
     
     // Auto-clear message after 5 seconds
     setTimeout(() => setViolationMessage(null), 5000);
@@ -103,6 +107,7 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
   useEffect(() => {
     if (isDisqualified) {
       console.error("[ANTI-CHEAT LOG] Siswa didiskualifikasi karena terlalu banyak pelanggaran.");
+      setShowViolationModal(false);
       handleSubmit(true, "Diskualifikasi: Terlalu banyak pelanggaran anti-cheat.");
     }
   }, [isDisqualified]);
@@ -365,6 +370,58 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({ examId, onFinishExam, use
                 AKSES SELESAI
             </Button>
         </div>
+
+        {/* Anti-Cheat Interactive Red Alert Modal */}
+        {showViolationModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-rose-950/85 backdrop-blur-md animate-fade-in text-slate-800 dark:text-white">
+            <div className="w-full max-w-lg bg-white dark:bg-slate-950 p-8 rounded-3xl shadow-[0_0_50px_rgba(239,68,68,0.3)] border-2 border-rose-500 relative overflow-hidden space-y-6 text-center">
+              {/* Top Accent */}
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-rose-600 animate-pulse" />
+              
+              <div className="flex flex-col items-center space-y-4">
+                <div className="w-20 h-20 bg-rose-500/10 dark:bg-rose-500/20 rounded-full flex items-center justify-center text-rose-500 border-2 border-rose-500 animate-bounce">
+                  <ShieldAlert className="w-10 h-10 animate-pulse" />
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-black text-rose-600 tracking-tight uppercase">⚠️ Deteksi Pelanggaran Sistem Ujian ⚠️</h3>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Sistem mendeteksi aktivitas mencurigakan karena Anda mencoba berpindah halaman atau meninggalkan jendela pengerjaan.
+                  </p>
+                </div>
+              </div>
+
+              {/* Warning Counter */}
+              <div className="p-4 bg-rose-500/10 dark:bg-rose-500/20 rounded-2xl border-2 border-rose-500/35 flex flex-col items-center justify-center gap-2">
+                <div className="text-3xl font-black text-rose-600 font-mono">
+                  {warnings} / 3 Peringatan
+                </div>
+                <div className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest leading-relaxed">
+                  Batas maksimum: 3 Peringatan. Melebihi batas ini Anda akan otomatis DIDISKUALIFIKASI dari sistem ujian!
+                </div>
+              </div>
+
+              {/* Specific detail of breach */}
+              <div className="p-4 bg-rose-50 dark:bg-rose-950/40 rounded-2xl text-xs font-bold leading-relaxed space-y-1 text-left">
+                <div className="text-rose-700 dark:text-rose-300">
+                  <strong className="uppercase">Aktivitas Terlarang:</strong> {latestViolationType === 'visibility' ? 'Berpindah Tab / Aplikasi Lain' : 'Meninggalkan Jendela / Kehilangan Fokus Layar'}
+                </div>
+                <p className="font-semibold text-slate-600 dark:text-slate-450">
+                  Semua aktivitas perpindahan tab atau fokus browser dicatat demi transparansi dan keadilan ujian online ini.
+                </p>
+              </div>
+
+              {/* Confirmation / Promise Button */}
+              <Button 
+                onClick={() => setShowViolationModal(false)}
+                variant="danger"
+                className="w-full py-4 text-xs font-black uppercase tracking-widest rounded-2xl shadow-lg border-none bg-rose-600 hover:bg-rose-500 active:scale-95 transition-all text-white"
+              >
+                SAYA MENGERTI & LANJUTKAN UJIAN
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Custom Confirmation Modal */}
         {isSubmitModalOpen && (
